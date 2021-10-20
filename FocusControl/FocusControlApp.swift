@@ -11,7 +11,7 @@ import SwiftUI
 struct FocusControlApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
         }
     }
 }
