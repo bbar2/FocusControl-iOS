@@ -6,20 +6,22 @@
 //
 
 import SwiftUI
-enum FocusMode {
-  case course
-  case medium
-  case fine
+
+// Define the number of focus motor steps for each FocusMode
+enum FocusMode:Int {
+  case course = 100
+  case medium = 25
+  case fine   = 1
 }
 
 class MainViewModel : ObservableObject {
+
   @Published var statusString = "Not Connected"
-  @Published var focusCommand = 0
+  @Published var focusMotorCommand = 0
 
   public var connected = false
   public var focusMode = FocusMode.medium
   
-
   // Start looking for BLE peripheral
   func beginBle(){
     statusString = "Searching ..."
@@ -31,23 +33,12 @@ class MainViewModel : ObservableObject {
     connected = false
   }
   
-  private func getDeltaFocus()->Int {
-    switch(focusMode) {
-    case .course:
-      return 100
-    case .medium:
-      return 25
-    case .fine:
-      return 1
-    }
-  }
-  
   func increaseFocus(){
-    focusCommand += getDeltaFocus()
+    focusMotorCommand += focusMode.rawValue
   }
   
   func decreaseFocus(){
-    focusCommand -= getDeltaFocus()
+    focusMotorCommand -= focusMode.rawValue
   }
   
   func viewAppear(){

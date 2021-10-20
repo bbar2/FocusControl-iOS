@@ -52,7 +52,7 @@ struct MainView: View {
       }.buttonStyle(.bordered)
       HStack{
         Text("Focus Command")
-        Text(viewModel.focusCommand.description)
+        Text(viewModel.focusMotorCommand.description)
       }
     }
 
