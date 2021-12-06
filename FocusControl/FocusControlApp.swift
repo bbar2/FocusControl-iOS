@@ -9,9 +9,10 @@ import SwiftUI
 
 @main
 struct FocusControlApp: App {
+
     var body: some Scene {
         WindowGroup {
-            MainView()
+            ControlView()
         }
     }
 }
