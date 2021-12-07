@@ -2,39 +2,19 @@
 //  ContentView.swift
 //  FocusControl
 //
-//  Created by Barry Bryant on 10/19/21 - iOS UI to control a telescope focus
-// motor.  The focus-motor is attached to the manual focus knob on a telescope.
-// The UI is sized for an iPhone, or a half screen iPad.  The iPad use case
-// anticipates use in parallel with a separate app (other half screen) to
-// control telescope pointing.
+// Telescope Focus UI simulates FocusMotor hardware remote control's rotary
+// encoder knob using two UI buttons to drive the FocusMotor clockwise (CW) or
+// counter clockwise (CCW).
 //
-//   The focus-motor is controlled by a Blue Tooth Low Energy (BLE) interface.
-// In BLE parlance, the focus-motor is a BLE Peripheral (aka Server), and the
-// remote control is a BLE Central (aka Client). The focus-motor BLE interface
-// exposes one service with one writable data value, commanded motor position,
-// which this BLE Central app updates via two focus buttons.  One button turns
-// the focus-motor clockwise, the other turns the focus-motor counter clockwise.
+// Also provides controls to switch focus control mode between Coarse, Medium,
+// and Fine modes.  Coarse mode moves the FocusMotor the most per UI operation,
+// providing an initial coarse level of focus control.  Fine mode moves the
+// FocusMotor in very small steps providing the finest level of focus control.
+// Medium mode is in the middle.
 //
-//   This app can be uses as an alternative to the hardware remote control
-// which uses a rotating knob to control focus, a yellow LED to inidcate a lack
-// of a BLE connection, and two red LEDs to indicate focus mode.
-//
-//  The app runs in three diferent focus modes, determined by a selector on
-// the UI.
-// Course Mode - Turn the focus-motor MANY micro steps per button press.  Used
-//               for course initial focusing, to get in the ball park.
-//               Course Mode is indicated by both red LEDs off.
-// Medium Mode - Turn the focus-motor MANY/4 micro steps per button press. Used
-//               for more precise focusing. Indicated by one red LED on.
-// Fine Mode - Turn the focus-motor 1 micro step per button press.  The
-//             smallestadjustments possible. Indicated by both red LEDs on.
-//
-// The BLE connection process is initiated when the GUI appears.  The yellow
-// indicator remains yellow until the BLE connection is complete. The BLE
-// connection is released when the GUI disappears.  The yellow indictator
-// on the UI indicates mirrors the function of the yellow LED on the hardware
-// remote control device.
-//
+// FocusMotorController transmits FocusMotor commands via Bluetooth Low
+// Energy (BLE). UI status message field shows state of BLE connection.
+
 
 import SwiftUI
 

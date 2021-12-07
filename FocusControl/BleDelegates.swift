@@ -2,67 +2,53 @@
 //  BleDelegates.swift
 //  FocusControl
 //
-//  Created by Barry Bryant on 12/5/21.
+//  Created by Barry Bryant on 12/5/21
+//  Base class sets iOS app as BLE Central to communicate with BLE Peripheral
 //
+//  Derive a model class from this class.  Then call:
+//  1. bleInit - to initiate CBCentralManager and CBPeripheral Delegates
+//  2. Optionally override any report...() methods sync model state to any
+//     state of delegate processing.
+//  3. bleWrite - to write data to a Peripheral
+//  4. bleRead - to initiate a noWait read from Peripheral.
 
 import CoreBluetooth
+import UIKit
 
 class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
 
-  // All UUIDs must match the Arduino C++ focus motor controller and remote control UUIDs
-  private var service_uuid = CBUUID(string: "00000000-0000-0000-0000-000000000000")
-  
-  // Parameter Characteristic UUIDs
-  private let FOCUS_POSITION_UUID  = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
-  private let NUM_MICRO_STEPS_UUID = CBUUID(string: "828b0002-046a-42c7-9c16-00ca297e95eb")
+  private var service_uuid: CBUUID!     // UUID of desired service
+  private var ble_data_uuid: [CBUUID]!  // UUID for each BLE data value
+ 
+  private var dataDictionary: [CBUUID: CBCharacteristic?] = [:] // uuid to characteristic mapping
+  private var readResponderDictionary: [CBUUID: (Int32)->Void] = [:]
 
   // Core Bluetooth variables
   private var cbCentralManager       : CBCentralManager!
   private var focusMotorPeripheral   : CBPeripheral?
-  private var positionCharacteristic : CBCharacteristic? // Written to BLE
 
-  private var uStepCharacteristic : CBCharacteristic?  // Read from BLE
-  private var bleMicroSteps: Int32?
-
-  // Called by FocusMotorController to initialize BLE communication
-  func focusMotorBleInit(service_uuid uuid:CBUUID) {
+  // Called by derived class to initialize BLE communication
+  func bleInit(service_uuid uuid:CBUUID, ble_data_uuid ble_data:[CBUUID]) {
     service_uuid = uuid
+    ble_data_uuid = ble_data
     
     //  Starts the sequence of Steps in FocusMotorBle delegates
     cbCentralManager = CBCentralManager(delegate: self, queue: nil)
   }
 
-  // Called by FocusMotorController to send commands over BLE
-  func focusMotorSendBleCommand(_ cmd: Int32) {
-    if let _ = positionCharacteristic {
-      let data = Data(bytes: [cmd], count: 4) // Int32 cmd is 4 bytes
-      focusMotorPeripheral?.writeValue(data,
-                                       for: positionCharacteristic!,
-                                       type: .withoutResponse)
-    }
-  }
-  
-  // CBPeripheralDelegate reads microSteps during initialization.
-  // microSteps is FocusMotor constant, no need to re-read CBCharacteristic
-  func getBleFocusMotorMicroSteps() -> Int32 {
-    return bleMicroSteps ?? 4 // good guess if called before BLE read complete
-  }
-
-
 //MARK:- CBCentralManagerDelegate
 
   // Step 1 - Start scanning for BLE DEVICE advertising required SERVICE
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
-    if (central.state == .poweredOn)
-    {
+    if (central.state == .poweredOn) {
       reportBleScanning()
       central.scanForPeripherals(withServices: [service_uuid],
                                  options: nil)
-    } else
-    {
+    } else {
       reportBleNotAvailable()
     }
   }
+  
   func reportBleScanning(){
       print("override reportBleScanning() in derived class")
   }
@@ -82,6 +68,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
     focusMotorPeripheral = peripheral
     reportBleServiceFound()
   }
+  
   func reportBleServiceFound(){
     print("override reportBleServiceConnected() in derived class")
   }
@@ -95,6 +82,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
 
     reportBleServiceConnected()
   }
+  
   func reportBleServiceConnected() {
     print("override reportBleServiceConnected() in derived class")
   }
@@ -134,9 +122,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
 
     if let services = peripheral.services {
       for service in services {
-        peripheral.discoverCharacteristics(
-          [FOCUS_POSITION_UUID, NUM_MICRO_STEPS_UUID],
-          for: service)
+        peripheral.discoverCharacteristics(ble_data_uuid, for: service)
       }
     }
   }
@@ -152,22 +138,41 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
       return
     }
 
-    print("Step 5 - ")
+    // Create a dictionary to find characteristics, via UUID
     if let charac = service.characteristics{
       for characteristic in charac {
-        if characteristic.uuid == FOCUS_POSITION_UUID {
-          positionCharacteristic = characteristic
-        } else if (characteristic.uuid == NUM_MICRO_STEPS_UUID) {
-          uStepCharacteristic = characteristic
-
-          // Get initial value from characteristic.value in peripheral:didUpdateValueFor
-          peripheral.readValue(for: characteristic)
-          //peripheral.setNotifyValue(true, for: characteristic) // use if expecting udpates
-        }
+        dataDictionary[characteristic.uuid] = characteristic
       }
+    }
+    reportBleServiceCharaceristicsScanned()
+  }
+  
+  func reportBleServiceCharaceristicsScanned(){
+    print("override reportBleServiceDisconnected() in derived class")
+  }
+  
+//MARK:- Write(UUID) and Read(UUID) calls
+
+  // Called by derived class to write data to BLE
+  func bleWrite(_ write_uuid: CBUUID, writeData: Int32) {
+    if let write_characteristic = dataDictionary[write_uuid] {
+      let data = Data(bytes: [writeData], count: 4) // Int32 cmd is 4 bytes
+      focusMotorPeripheral?.writeValue(data,
+                                       for: write_characteristic!,
+                                       type: .withoutResponse)
     }
   }
   
+  func bleRead(_ readUuid:CBUUID, responder:@escaping (Int32)->Void) -> Bool{
+    
+    if let read_characteristic = dataDictionary[readUuid] {     // find characteristic
+      focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
+      readResponderDictionary[readUuid] = responder             // who to call when read completes
+      return true // characteristic found, data will be provided to responder
+    }
+    return false // characteristic not found
+  }
+
   // Called by peripheral.readValue, or after updates if using peripheral.setNotifyValue
   func peripheral(_ peripheral: CBPeripheral,
                   didUpdateValueFor characteristic: CBCharacteristic,
@@ -178,13 +183,19 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
       print(e.localizedDescription)
       return
     }
+
+    // assume all read values are Int32 for now
+    // - else let specific responder do appropriate .getBytes mapping
+    var readData:Int32 = 0
+    // Copy Data buffer to Int32
+    if let data = characteristic.value {
+      (data as NSData).getBytes(&readData, length:4)
+    }
     
-    if (characteristic.uuid == NUM_MICRO_STEPS_UUID) {
-      // Copy Data buffer to Int32
-      if let data = characteristic.value {
-        (data as NSData).getBytes(&bleMicroSteps, length:4)
-      }
+    // call UUID's responder with the Int32 Data
+    if let responder = readResponderDictionary[characteristic.uuid] {
+      responder(readData)
     }
   }
-  
+
 }
