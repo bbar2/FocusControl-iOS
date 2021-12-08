@@ -20,7 +20,8 @@ import SwiftUI
 
 struct ControlView: View {
   @ObservedObject var viewModel = ControlViewModel();
-
+  
+  /// <#Description#>
   var body: some View {
     VStack {
       
@@ -31,49 +32,60 @@ struct ControlView: View {
         Text("Status: ")
         Text(viewModel.statusString)
       }
-      Text("").padding()
+      
+      Text("").padding(50)
 
       // Focus mode selection and indication area
       // Red circles emulate red LEDs on hardware device.
       Text("Focus Mode")
       HStack{
         Picker(selection: $viewModel.focusMode,
-               label: Text("Focus Mode")) {
+               label: Text("???")) {
           Text("Course").tag(FocusMode.course)
           Text("Medium").tag(FocusMode.medium)
           Text("Fine").tag(FocusMode.fine)
         }
         .pickerStyle(.segmented)
-        .padding()
+        .colorMultiply(.red) // kludge to get red
       }
-      Text("").padding()
+      
+      Text("").padding(30)
 
       // Focus control area - BIG buttons simplify focusing
       // while looking through telescope and not at UI.
       Text("Adjust Focus")
+      let frameWidth:CGFloat = 190
       HStack {
-        Button("\n FOCUS \n\n CCW \n",
-               action:{viewModel.updateMotorCommandCCW()})
-        Button("\n FOCUS \n\n CW \n",
-               action:{viewModel.updateMotorCommandCW()})
-      }.buttonStyle(.bordered)
+        Button("\nCounter\nClockwise\n") {
+          viewModel.updateMotorCommandCCW()}
+        .frame(width:frameWidth)
+        Button("\nClockwise\n\n") {
+          viewModel.updateMotorCommandCW()}
+        .frame(width:frameWidth)
+      }
+      .buttonStyle(.bordered)
       HStack{
         Text("Focus Command")
         Text(viewModel.motorCommand.description)
       }
     }
-
+    
     .onAppear{
       viewModel.focusMotorInit()
-    }
-    
-    .onDisappear{
-//      viewModel.focusMotorClose()
-    }
 
+      //Change picker font size
+      UISegmentedControl.appearance().setTitleTextAttributes(
+        [.font : UIFont.preferredFont(forTextStyle: .title1)],
+        for: .normal)
+
+    }.preferredColorScheme(.dark)
+    .foregroundColor(.red)
+    .tint(.pink)
+    .controlSize(.large)
+    .font(.title)
   }
-
 }
+
 
 struct MainView_Previews: PreviewProvider {
   static var previews: some View {

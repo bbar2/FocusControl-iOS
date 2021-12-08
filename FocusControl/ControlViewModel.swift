@@ -54,7 +54,7 @@ class ControlViewModel : BleDelegates, ObservableObject  {
   //   x 10 to get 200 ble_central steps per 20 encoder steps
   //   x sprocket ratio of 74/20 knob to motor teeth
   private let fullStepsPerUiInput:Int32 = 10 * 74 / 20
-  private var microStepJumper:Int32?
+  private var microStepJumper:Int32? // jumper on focus motor, reported via BLE
 
   // Called by ViewController to initialize FocusMotorController
   func focusMotorInit(){
@@ -64,7 +64,7 @@ class ControlViewModel : BleDelegates, ObservableObject  {
     initViewModel()
   }
   
-  // Called by focusMotorInit & BleDelegates overrides on BLE Connect or Disconnect
+  // Called by focusMotorInit & BleDelegate overrides on BLE Connect or Disconnect
   func initViewModel(){
     motorCommand = 0
     focusMode = FocusMode.medium
@@ -97,28 +97,31 @@ class ControlViewModel : BleDelegates, ObservableObject  {
     _ = bleRead(NUM_MICRO_STEPS_UUID) {self.microStepJumper = $0}
   }
   
+  // Clockwise UI action
   func updateMotorCommandCW(){
-    motorCommand += changeBy()
+    motorCommand += focusStepSize()
     bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
   }
-  
+
+  // Counter Clockwise UI action
   func updateMotorCommandCCW(){
-    motorCommand -= changeBy()
+    motorCommand -= focusStepSize()
     bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
   }
   
-  func changeBy() -> Int32 {
-    let numMicroSteps = microStepJumper ?? 3 // odd number shows me the read never took place
+  // Determine size of focus step as a function of focusMode
+  func focusStepSize() -> Int32 {
+    let numMicroSteps = microStepJumper ?? 3 // odd number shows the read never took place
 
     switch (focusMode) {
     case .course:
       // Match precision of hardware remote control
       return fullStepsPerUiInput * numMicroSteps
     case .medium:
-      // Smaller steps for improved focus control - force to multiple of MicroSteps
+      // Smaller steps for improved focus control. Force multiple of MicroSteps
       return fullStepsPerUiInput / 4 * numMicroSteps
     case .fine:
-      // Smallest steps for finest control.  Could go finer with single microSteps,
+      // Smallest steps for finest control.  Could go finer with microSteps,
       // but that seems too small in practice. Go with full steps for now.
       return numMicroSteps // one full step
     }
