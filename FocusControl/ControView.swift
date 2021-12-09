@@ -16,12 +16,10 @@
 // Energy (BLE). UI status message field shows state of BLE connection.
 
 import SwiftUI
-import CoreHaptics
 
 struct ControlView: View {
   @ObservedObject var viewModel = ControlViewModel();
-  @State private var engine:CHHapticEngine?
-
+  
   var body: some View {
     VStack {
       
@@ -47,7 +45,6 @@ struct ControlView: View {
         }
         .pickerStyle(.segmented)
         .colorMultiply(.red) // kludge to get red
-        .onTapGesture{hapticBump()}
       }
       
       Text("").padding(30)
@@ -58,11 +55,11 @@ struct ControlView: View {
       let frameWidth:CGFloat = 190
       HStack {
         Button("\nCounter\nClockwise\n") {
-          hapticBump()
+          heavyBump()
           viewModel.updateMotorCommandCCW()}
         .frame(width:frameWidth)
         Button("\nClockwise\n\n") {
-          hapticBump()
+          heavyBump()
           viewModel.updateMotorCommandCW()
         }
         .frame(width:frameWidth)
@@ -75,7 +72,6 @@ struct ControlView: View {
     }
      
     .onAppear{
-      prepareHaptics()
       viewModel.focusMotorInit()
 
       //Change picker font size
@@ -89,28 +85,18 @@ struct ControlView: View {
     .controlSize(.large)
     .font(.title)
   }
-
-  func prepareHaptics() {
-    guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-    
-    do {
-      self.engine = try CHHapticEngine()
-      try engine?.start()
-    } catch {
-      print("There was an error creating Haptics engine: \(error.localizedDescription)")
-    }
-  }
   
-  func hapticBump() {
-    let impact = UIImpactFeedbackGenerator(style: .heavy)
-    impact.impactOccurred()
+  func heavyBump(){
+    let haptic = UIImpactFeedbackGenerator(style: .heavy)
+    haptic.impactOccurred()
   }
-}
 
+}
 
 
 struct MainView_Previews: PreviewProvider {
   static var previews: some View {
       ControlView()
+      .previewDevice(PreviewDevice(rawValue: "iPhone Xs"))
   }
 }
