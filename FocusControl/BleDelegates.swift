@@ -7,7 +7,7 @@
 //
 //  Derive a model class from this class.  Then call:
 //  1. bleInit - to initiate CBCentralManager and CBPeripheral Delegates
-//  2. Optionally override any report...() methods sync model state to any
+//  2. Optionally override any report...() methods to sync model state to any
 //     state of delegate processing.
 //  3. bleWrite - to write data to a Peripheral
 //  4. bleRead - to initiate a noWait read from Peripheral.
@@ -165,15 +165,16 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   
   func bleRead(_ readUuid:CBUUID, responder:@escaping (Int32)->Void) -> Bool{
     
-    if let read_characteristic = dataDictionary[readUuid] {     // find characteristic
+    if let read_characteristic = dataDictionary[readUuid] {      // find characteristic
       focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
-      readResponderDictionary[readUuid] = responder             // who to call when read completes
+      readResponderDictionary[readUuid] = responder              // handle data when read completes
       return true // characteristic found, data will be provided to responder
     }
     return false // characteristic not found
   }
 
-  // Called by peripheral.readValue, or after updates if using peripheral.setNotifyValue
+  // Called by peripheral.readValue,
+  // or after updates if using peripheral.setNotifyValue
   func peripheral(_ peripheral: CBPeripheral,
                   didUpdateValueFor characteristic: CBCharacteristic,
                   error: Error?)
@@ -184,8 +185,8 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
       return
     }
 
-    // assume all read values are Int32 for now
-    // - else let specific responder do appropriate .getBytes mapping
+    // assume all read values are Int32
+    // - else require each responder to perform appropriate .getBytes mapping
     var readData:Int32 = 0
     // Copy Data buffer to Int32
     if let data = characteristic.value {

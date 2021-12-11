@@ -1,8 +1,8 @@
 //  ControlViewModel.swift - Created by Barry Bryant on 10/19/21.
 //
-// Telescope Focus controller simulates FocusMotor hardware remote control's
-// 20 step rotary encoder. Each tap on a UI button emulates one rotary encoder
-// step.  Each rotary tap (encoder step) changes the FocusMotor position
+// Simulate FocusMotor hardware remote control's 20 step rotary encoder.
+// Each tap on a UI button emulates one rotary encoder step.
+// Each rotary tap (encoder step) changes the FocusMotor position
 // command by some number of FocusMotor stepper motor steps.
 //
 // The FocusMotor command is scaled for each mode of operation, matching the
@@ -13,11 +13,12 @@
 // - Fine mode: the FocusMotor is driven one full stepper motor step for the
 //   finest level of focus control.
 //
-// This ControlViewModel implements the iOS remote control "BLE Central":
+// ControlViewModel implements an iOS remote control "BLE Central":
 //   - Establish BLE communication with FocusMotor Peripheral
 //   - Read value of microStep jumpers written by FocusMotor
 //   - Transmits the FocusMotor commanded position
-//   - Converts between CoreBlutooth UInt8 buffers and Int32 values
+//   - Converts between CoreBlutooth UInt8 buffers and Int32 values. The
+//     FocusMotor hardware is Arduino Nano33BLE based, using Int32 data.
 //
 // Both the hardware remote control and this app tranmit FocusMotor commands
 // via Bluetooth Low Energy (BLE).  Only one can be connected to the actual

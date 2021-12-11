@@ -59,7 +59,7 @@ struct ControlView: View {
           viewModel.updateMotorCommandCCW()}
         .frame(width:frameWidth)
         Button("\nClockwise\n\n") {
-          heavyBump()
+          softBump()
           viewModel.updateMotorCommandCW()
         }
         .frame(width:frameWidth)
@@ -88,6 +88,11 @@ struct ControlView: View {
   
   func heavyBump(){
     let haptic = UIImpactFeedbackGenerator(style: .heavy)
+    haptic.impactOccurred()
+  }
+  
+  func softBump(){
+    let haptic = UIImpactFeedbackGenerator(style: .soft)
     haptic.impactOccurred()
   }
 
