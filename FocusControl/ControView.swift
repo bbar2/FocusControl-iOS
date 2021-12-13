@@ -31,39 +31,35 @@ struct ControlView: View {
         Text(viewModel.statusString)
       }
       
-      Text("").padding(50)
+      Spacer()
 
       // Focus mode selection and indication area
       // Red circles emulate red LEDs on hardware device.
       Text("Focus Mode").bold()
-      HStack{
-        Picker(selection: $viewModel.focusMode,
-               label: Text("???")) {
-          Text("Course").tag(FocusMode.course)
-          Text("Medium").tag(FocusMode.medium)
-          Text("Fine").tag(FocusMode.fine)
-        }
-        .pickerStyle(.segmented)
-        .colorMultiply(.red) // kludge to get red
+      Picker(selection: $viewModel.focusMode,
+             label: Text("???")) {
+        Text("Course").tag(FocusMode.course)
+        Text("Medium").tag(FocusMode.medium)
+        Text("Fine").tag(FocusMode.fine)
       }
+      .pickerStyle(.segmented)
       
-      Text("").padding(30)
+      Spacer()
 
       // Focus control area - BIG buttons simplify focusing
       // while looking through telescope and not at UI.
       Text("Adjust Focus").bold()
-      let frameWidth:CGFloat = 190
       HStack {
         Button("\nCounter\nClockwise\n") {
           heavyBump()
           viewModel.updateMotorCommandCCW()}
-        .frame(width:frameWidth)
+        Spacer()
         Button("\nClockwise\n\n") {
           softBump()
           viewModel.updateMotorCommandCW()
         }
-        .frame(width:frameWidth)
       }
+      .foregroundColor(.white)
       .buttonStyle(.bordered)
       HStack{
         Text("Focus Command")
@@ -80,10 +76,9 @@ struct ControlView: View {
         for: .normal)
 
     }.preferredColorScheme(.dark)
-    .foregroundColor(.red)
-    .tint(.pink)
     .controlSize(.large)
     .font(.title)
+    .colorMultiply(.red) // turn all whites to reds
   }
   
   func heavyBump(){
