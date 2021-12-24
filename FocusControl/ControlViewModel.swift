@@ -95,8 +95,11 @@ class ControlViewModel : BleDelegates, ObservableObject  {
   
   override func reportBleServiceCharaceristicsScanned() {
     // one time read of static value reported by focus motor
-    // bleRead(NUM_MICRO_STEPS_UUID) {(readData:Int32) in self.microStepJumper = readData }
-    bleRead(NUM_MICRO_STEPS_UUID) {self.microStepJumper = $0} // escaping - saved in base's readResponderDictionary
+//    bleRead(NUM_MICRO_STEPS_UUID) {(readData:Int32) in self.microStepJumper = readData }
+//    bleRead(NUM_MICRO_STEPS_UUID) {self.microStepJumper = $0} // escaping - saved in base's readResponderDictionary
+    bleRead(uuid: NUM_MICRO_STEPS_UUID) { [weak self] resultInt in
+      self?.microStepJumper = resultInt
+    }
   }
   
   // Clockwise UI action

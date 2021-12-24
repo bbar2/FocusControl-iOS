@@ -15,7 +15,7 @@
 import CoreBluetooth
 import UIKit
 
-class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
+class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
   private var service_uuid: CBUUID!     // UUID of desired service
   private var ble_data_uuid: [CBUUID]!  // UUID for each BLE data value
@@ -42,8 +42,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
     if (central.state == .poweredOn) {
       reportBleScanning()
-      central.scanForPeripherals(withServices: [service_uuid],
-                                 options: nil)
+      central.scanForPeripherals(withServices: [service_uuid], options: nil)
     } else {
       reportBleNotAvailable()
     }
@@ -139,8 +138,8 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
     }
 
     // Create a dictionary to find characteristics, via UUID
-    if let charac = service.characteristics{
-      for characteristic in charac {
+    if let characteristic = service.characteristics {
+      for characteristic in characteristic {
         dataDictionary[characteristic.uuid] = characteristic
       }
     }
@@ -163,11 +162,10 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
     }
   }
   
-  @discardableResult func bleRead(_ readUuid:CBUUID, responder:@escaping (Int32)->Void) -> Bool{
-    
-    if let read_characteristic = dataDictionary[readUuid] {      // find characteristic
+  @discardableResult func bleRead(uuid: CBUUID, onReadResult: @escaping (Int32)->Void) -> Bool {
+    if let read_characteristic = dataDictionary[uuid] {      // find characteristic
       focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
-      readResponderDictionary[readUuid] = responder              // handle data when read completes
+      readResponderDictionary[uuid] = onReadResult              // handle data when read completes
       return true // characteristic found, data will be provided to responder
     }
     return false // characteristic not found
