@@ -50,11 +50,11 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   }
   
   func reportBleScanning(){
-      print("override reportBleScanning() in derived class")
+      print("optionally override reportBleScanning() in derived class")
   }
   
   func reportBleNotAvailable(){
-    print("override reportBleNotAvailable() in derived class")
+    print("optionally override reportBleNotAvailable() in derived class")
   }
 
   // Step 2 - Once SERVICE found found, stop scanning and connect Peripheral
@@ -70,7 +70,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   }
   
   func reportBleServiceFound(){
-    print("override reportBleServiceConnected() in derived class")
+    print("optionally override reportBleServiceConnected() in derived class")
   }
   
   // Step 3 - Once connected to peripheral, Find desired service
@@ -84,7 +84,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   }
   
   func reportBleServiceConnected() {
-    print("override reportBleServiceConnected() in derived class")
+    print("optionally override reportBleServiceConnected() in derived class")
   }
   
   // If disconnected - resume  scanning for Focus Motor peripheral
@@ -104,7 +104,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   }
 
   func reportBleServiceDisconnected() {
-    print("override reportBleServiceDisconnected() in derived class")
+    print("optionally override reportBleServiceDisconnected() in derived class")
   }
 
 
@@ -148,7 +148,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   }
   
   func reportBleServiceCharaceristicsScanned(){
-    print("override reportBleServiceDisconnected() in derived class")
+    print("optionally override reportBleServiceDisconnected() in derived class")
   }
   
 //MARK:- Write(UUID) and Read(UUID) calls
@@ -156,14 +156,14 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate{
   // Called by derived class to write data to BLE
   func bleWrite(_ write_uuid: CBUUID, writeData: Int32) {
     if let write_characteristic = dataDictionary[write_uuid] {
-      let data = Data(bytes: [writeData], count: 4) // Int32 cmd is 4 bytes
+      let data = Data(bytes: [writeData], count: 4) // Int32 writeData is 4 bytes
       focusMotorPeripheral?.writeValue(data,
                                        for: write_characteristic!,
                                        type: .withoutResponse)
     }
   }
   
-  func bleRead(_ readUuid:CBUUID, responder:@escaping (Int32)->Void) -> Bool{
+  @discardableResult func bleRead(_ readUuid:CBUUID, responder:@escaping (Int32)->Void) -> Bool{
     
     if let read_characteristic = dataDictionary[readUuid] {      // find characteristic
       focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
