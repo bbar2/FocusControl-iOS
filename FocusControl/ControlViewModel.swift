@@ -36,17 +36,20 @@ enum FocusMode:Int {
   case fine
 }
 
-class ControlViewModel : BleDelegates, ObservableObject  {
+class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   // All UUIDs must match the Arduino C++ focus motor controller and remote control UUIDs
   private let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
 
   // Parameter Characteristic UUIDs
-  private let FOCUS_POSITION_UUID  = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
+  private let FOCUS_POSITION_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
   private let NUM_MICRO_STEPS_UUID = CBUUID(string: "828b0002-046a-42c7-9c16-00ca297e95eb")
+
+  private let wizard: BleWizard
 
   @Published var statusString = "Not Connected"
   @Published var motorCommand: Int32 = 0
+
   public var focusMode = FocusMode.medium
 
   // From C++ Hardware FocusMotor Controller:
@@ -56,11 +59,17 @@ class ControlViewModel : BleDelegates, ObservableObject  {
   //   x sprocket ratio of 74/20 knob to motor teeth
   private let fullStepsPerUiInput:Int32 = 10 * 74 / 20
   private var microStepJumper:Int32? // jumper on focus motor, reported via BLE
+  
+  init() {
+    self.wizard = BleWizard(
+      serviceUUID: FOCUS_SERVICE_UUID,
+      bleDataUUIDs: [FOCUS_POSITION_UUID, NUM_MICRO_STEPS_UUID])
+    wizard.delegate = self
+  }
 
   // Called by ViewController to initialize FocusMotorController
-  func focusMotorInit(){
-    bleInit(service_uuid: FOCUS_SERVICE_UUID,
-            ble_data_uuid: [FOCUS_POSITION_UUID,NUM_MICRO_STEPS_UUID])
+  func focusMotorInit() {
+    wizard.start()
     statusString = "Searching for Focus-Motor ..."
     initViewModel()
   }
@@ -71,47 +80,49 @@ class ControlViewModel : BleDelegates, ObservableObject  {
     focusMode = FocusMode.medium
   }
 
-  override func reportBleScanning() {
+  func reportBleScanning() {
     statusString = "Scanning ..."
   }
   
-  override func reportBleNotAvailable() {
+  func reportBleNotAvailable() {
     statusString = "BLE Not Available"
   }
 
-  override func reportBleServiceFound(){
+  func reportBleServiceFound(){
     statusString = "Focus Motor Found"
   }
   
-  override func reportBleServiceConnected(){
+  func reportBleServiceConnected(){
     initViewModel()
     statusString = "Connected"
   }
   
-  override func reportBleServiceDisconnected(){
+  func reportBleServiceDisconnected(){
     initViewModel()
     statusString = "Disconnected"
   }
   
-  override func reportBleServiceCharaceristicsScanned() {
+  func reportBleServiceCharaceristicsScanned() {
     // one time read of static value reported by focus motor
-//    bleRead(NUM_MICRO_STEPS_UUID) {(readData:Int32) in self.microStepJumper = readData }
-//    bleRead(NUM_MICRO_STEPS_UUID) {self.microStepJumper = $0} // escaping - saved in base's readResponderDictionary
-    bleRead(uuid: NUM_MICRO_STEPS_UUID) { [weak self] resultInt in
-      self?.microStepJumper = resultInt
+    do {
+      try wizard.bleRead(uuid: NUM_MICRO_STEPS_UUID) { [weak self] resultInt in
+        self?.microStepJumper = resultInt
+      }
+    } catch {
+      print(error)
     }
   }
   
   // Clockwise UI action
   func updateMotorCommandCW(){
     motorCommand += focusStepSize()
-    bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
+    wizard.bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
   }
 
   // Counter Clockwise UI action
   func updateMotorCommandCCW(){
     motorCommand -= focusStepSize()
-    bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
+    wizard.bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
   }
   
   // Determine size of focus step as a function of focusMode

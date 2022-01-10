@@ -18,8 +18,8 @@
 import SwiftUI
 
 struct ControlView: View {
-  @ObservedObject var viewModel = ControlViewModel();
-  
+  @ObservedObject var viewModel = ControlViewModel()
+   
   var body: some View {
     VStack {
       

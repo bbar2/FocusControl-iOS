@@ -15,10 +15,21 @@
 import CoreBluetooth
 import UIKit
 
-class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+protocol BleWizardDelegate: AnyObject {
+  func reportBleScanning()
+  func reportBleNotAvailable()
+  func reportBleServiceFound()
+  func reportBleServiceConnected()
+  func reportBleServiceDisconnected()
+  func reportBleServiceCharaceristicsScanned()
+}
 
-  private var service_uuid: CBUUID!     // UUID of desired service
-  private var ble_data_uuid: [CBUUID]!  // UUID for each BLE data value
+class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+  
+  weak var delegate: BleWizardDelegate?
+
+  private var service_uuid: CBUUID     // UUID of desired service
+  private var ble_data_uuids: [CBUUID]  // UUID for each BLE data value
  
   private var dataDictionary: [CBUUID: CBCharacteristic?] = [:] // uuid to characteristic mapping
   private var readResponderDictionary: [CBUUID: (Int32)->Void] = [:]
@@ -27,33 +38,28 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
   private var cbCentralManager       : CBCentralManager!
   private var focusMotorPeripheral   : CBPeripheral?
 
+  init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
+    self.service_uuid = serviceUUID
+    self.ble_data_uuids = bleDataUUIDs
+    super.init()
+  }
+  
   // Called by derived class to initialize BLE communication
-  func bleInit(service_uuid uuid:CBUUID, ble_data_uuid ble_data:[CBUUID]) {
-    service_uuid = uuid
-    ble_data_uuid = ble_data
-    
-    //  Starts the sequence of Steps in FocusMotorBle delegates
+  public func start() {
     cbCentralManager = CBCentralManager(delegate: self, queue: nil)
   }
+
 
 //MARK:- CBCentralManagerDelegate
 
   // Step 1 - Start scanning for BLE DEVICE advertising required SERVICE
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
     if (central.state == .poweredOn) {
-      reportBleScanning()
+      delegate?.reportBleScanning()
       central.scanForPeripherals(withServices: [service_uuid], options: nil)
     } else {
-      reportBleNotAvailable()
+      delegate?.reportBleNotAvailable()
     }
-  }
-  
-  func reportBleScanning(){
-      print("optionally override reportBleScanning() in derived class")
-  }
-  
-  func reportBleNotAvailable(){
-    print("optionally override reportBleNotAvailable() in derived class")
   }
 
   // Step 2 - Once SERVICE found found, stop scanning and connect Peripheral
@@ -65,12 +71,10 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     cbCentralManager.stopScan()
     cbCentralManager.connect(peripheral, options: nil)
     focusMotorPeripheral = peripheral
-    reportBleServiceFound()
+    delegate?.reportBleServiceFound()
   }
   
-  func reportBleServiceFound(){
-    print("optionally override reportBleServiceConnected() in derived class")
-  }
+
   
   // Step 3 - Once connected to peripheral, Find desired service
   func centralManager(_ central: CBCentralManager,
@@ -79,12 +83,10 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     peripheral.delegate = self
     peripheral.discoverServices([service_uuid]) // already know it has it!
 
-    reportBleServiceConnected()
+    delegate?.reportBleServiceConnected()
   }
   
-  func reportBleServiceConnected() {
-    print("optionally override reportBleServiceConnected() in derived class")
-  }
+
   
   // If disconnected - resume  scanning for Focus Motor peripheral
   func centralManager(_ central: CBCentralManager,
@@ -99,12 +101,10 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     cbCentralManager.scanForPeripherals(withServices: [service_uuid],
                                         options: nil)
 
-    reportBleServiceDisconnected()
+    delegate?.reportBleServiceDisconnected()
   }
 
-  func reportBleServiceDisconnected() {
-    print("optionally override reportBleServiceDisconnected() in derived class")
-  }
+
 
 
 //MARK:- CBPeripheralDelegate
@@ -121,7 +121,7 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     if let services = peripheral.services {
       for service in services {
-        peripheral.discoverCharacteristics(ble_data_uuid, for: service)
+        peripheral.discoverCharacteristics(ble_data_uuids, for: service)
       }
     }
   }
@@ -143,12 +143,10 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         dataDictionary[characteristic.uuid] = characteristic
       }
     }
-    reportBleServiceCharaceristicsScanned()
+    delegate?.reportBleServiceCharaceristicsScanned()
   }
   
-  func reportBleServiceCharaceristicsScanned(){
-    print("optionally override reportBleServiceDisconnected() in derived class")
-  }
+
   
 //MARK:- Write(UUID) and Read(UUID) calls
 
@@ -162,13 +160,16 @@ class BleDelegates : NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
   }
   
-  @discardableResult func bleRead(uuid: CBUUID, onReadResult: @escaping (Int32)->Void) -> Bool {
-    if let read_characteristic = dataDictionary[uuid] {      // find characteristic
-      focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
-      readResponderDictionary[uuid] = onReadResult              // handle data when read completes
-      return true // characteristic found, data will be provided to responder
+  enum BluetoothReadError: LocalizedError {
+    case characteristicNotFound
+  }
+  
+  func bleRead(uuid: CBUUID, onReadResult: @escaping (Int32)->Void) throws {
+    guard let read_characteristic = dataDictionary[uuid] else {      // find characteristic
+      throw BluetoothReadError.characteristicNotFound
     }
-    return false // characteristic not found
+    focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
+    readResponderDictionary[uuid] = onReadResult              // handle data when read completes
   }
 
   // Called by peripheral.readValue,

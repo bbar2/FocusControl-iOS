@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		358607D8275D157000AAB37A /* BleDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 358607D7275D157000AAB37A /* BleDelegates.swift */; };
+		35A9FB11277629BA008C5533 /* BleWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A9FB10277629BA008C5533 /* BleWizard.swift */; };
 		35B9E757271F5876001993AA /* FocusControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E756271F5876001993AA /* FocusControlApp.swift */; };
 		35B9E75B271F587C001993AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 35B9E75A271F587C001993AA /* Assets.xcassets */; };
 		35B9E75E271F587C001993AA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 35B9E75D271F587C001993AA /* Preview Assets.xcassets */; };
@@ -16,7 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		358607D7275D157000AAB37A /* BleDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleDelegates.swift; sourceTree = "<group>"; };
+		35A9FB10277629BA008C5533 /* BleWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleWizard.swift; sourceTree = "<group>"; };
 		35B9E753271F5876001993AA /* FocusControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35B9E756271F5876001993AA /* FocusControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusControlApp.swift; sourceTree = "<group>"; };
 		35B9E75A271F587C001993AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -58,7 +58,7 @@
 				35B9E756271F5876001993AA /* FocusControlApp.swift */,
 				35B9E764271F58E1001993AA /* ControView.swift */,
 				35B9E768271F7404001993AA /* ControlViewModel.swift */,
-				358607D7275D157000AAB37A /* BleDelegates.swift */,
+				35A9FB10277629BA008C5533 /* BleWizard.swift */,
 				35B9E75A271F587C001993AA /* Assets.xcassets */,
 				35B9E75C271F587C001993AA /* Preview Content */,
 			);
@@ -144,8 +144,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				35B9E765271F58E1001993AA /* ControView.swift in Sources */,
+				35A9FB11277629BA008C5533 /* BleWizard.swift in Sources */,
 				35B9E757271F5876001993AA /* FocusControlApp.swift in Sources */,
-				358607D8275D157000AAB37A /* BleDelegates.swift in Sources */,
 				35B9E769271F7404001993AA /* ControlViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -277,7 +277,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"FocusControl/Preview Content\"";
-				DEVELOPMENT_TEAM = N725NP25J2;
+				DEVELOPMENT_TEAM = 4T6W4DAT74;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is required to communicate with telescope hardware!";
@@ -310,7 +310,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"FocusControl/Preview Content\"";
-				DEVELOPMENT_TEAM = N725NP25J2;
+				DEVELOPMENT_TEAM = 4T6W4DAT74;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is required to communicate with telescope hardware!";
