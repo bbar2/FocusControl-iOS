@@ -36,6 +36,11 @@ enum FocusMode:Int {
   case fine
 }
 
+struct FocusMsg {
+  var cmd : Int32
+  var val : Int32
+}
+
 class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   // All UUIDs must match the Arduino C++ focus motor controller and remote control UUIDs
@@ -43,12 +48,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   // Parameter Characteristic UUIDs
   private let FOCUS_POSITION_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
-  private let NUM_MICRO_STEPS_UUID = CBUUID(string: "828b0002-046a-42c7-9c16-00ca297e95eb")
+  private let NUM_MICRO_STEPS_UUID = CBUUID(string: "828b0004-046a-42c7-9c16-00ca297e95eb")
 
   private let wizard: BleWizard
 
   @Published var statusString = "Not Connected"
-  @Published var motorCommand: Int32 = 0
 
   public var focusMode = FocusMode.medium
 
@@ -76,7 +80,6 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   // Called by focusMotorInit & BleDelegate overrides on BLE Connect or Disconnect
   func initViewModel(){
-    motorCommand = 0
     focusMode = FocusMode.medium
   }
 
@@ -105,8 +108,10 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   func reportBleServiceCharaceristicsScanned() {
     // one time read of static value reported by focus motor
     do {
-      try wizard.bleRead(uuid: NUM_MICRO_STEPS_UUID) { [weak self] resultInt in
-        self?.microStepJumper = resultInt
+      // note the [capture-list] for the escaping closure who references self.
+      // Weak references are always optional, hence the self? optional chain.
+      try wizard.bleRead(uuid: NUM_MICRO_STEPS_UUID) { [weak self] resultInt32 in
+        self?.microStepJumper = resultInt32
       }
     } catch {
       print(error)
@@ -115,14 +120,14 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   // Clockwise UI action
   func updateMotorCommandCW(){
-    motorCommand += focusStepSize()
-    wizard.bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
+    wizard.bleWrite(FOCUS_POSITION_UUID,
+                    focusMsg:FocusMsg(cmd:20, val:focusStepSize()))
   }
 
   // Counter Clockwise UI action
   func updateMotorCommandCCW(){
-    motorCommand -= focusStepSize()
-    wizard.bleWrite(FOCUS_POSITION_UUID, writeData:motorCommand)
+    wizard.bleWrite(FOCUS_POSITION_UUID,
+                    focusMsg:FocusMsg(cmd:20, val:-focusStepSize()))
   }
   
   // Determine size of focus step as a function of focusMode

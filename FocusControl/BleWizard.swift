@@ -49,7 +49,6 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     cbCentralManager = CBCentralManager(delegate: self, queue: nil)
   }
 
-
 //MARK:- CBCentralManagerDelegate
 
   // Step 1 - Start scanning for BLE DEVICE advertising required SERVICE
@@ -74,8 +73,6 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     delegate?.reportBleServiceFound()
   }
   
-
-  
   // Step 3 - Once connected to peripheral, Find desired service
   func centralManager(_ central: CBCentralManager,
                       didConnect peripheral: CBPeripheral)
@@ -85,8 +82,6 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     delegate?.reportBleServiceConnected()
   }
-  
-
   
   // If disconnected - resume  scanning for Focus Motor peripheral
   func centralManager(_ central: CBCentralManager,
@@ -103,9 +98,6 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     delegate?.reportBleServiceDisconnected()
   }
-
-
-
 
 //MARK:- CBPeripheralDelegate
 
@@ -146,11 +138,9 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     delegate?.reportBleServiceCharaceristicsScanned()
   }
   
-
-  
 //MARK:- Write(UUID) and Read(UUID) calls
 
-  // Called by derived class to write data to BLE
+  // Called by derived class to write single Int32 to BLE
   func bleWrite(_ write_uuid: CBUUID, writeData: Int32) {
     if let write_characteristic = dataDictionary[write_uuid] {
       let data = Data(bytes: [writeData], count: 4) // Int32 writeData is 4 bytes
@@ -159,6 +149,17 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                                        type: .withoutResponse)
     }
   }
+  
+  // Called by derived class to write a FocusMsg struct to BLE
+  func bleWrite(_ write_uuid: CBUUID, focusMsg: FocusMsg) {
+    if let write_characteristic = dataDictionary[write_uuid] {
+      let data = Data(bytes: [focusMsg], count: 8) // Int32 writeData is 4 bytes
+      focusMotorPeripheral?.writeValue(data,
+                                       for: write_characteristic!,
+                                       type: .withoutResponse)
+    }
+  }
+  
   
   enum BluetoothReadError: LocalizedError {
     case characteristicNotFound

@@ -61,10 +61,6 @@ struct ControlView: View {
       }
       .foregroundColor(.white)
       .buttonStyle(.bordered)
-      HStack{
-        Text("Focus Command")
-        Text(viewModel.motorCommand.description)
-      }
     }
      
     .onAppear{
