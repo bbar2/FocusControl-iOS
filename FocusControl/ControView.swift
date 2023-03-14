@@ -18,8 +18,9 @@
 import SwiftUI
 
 struct ControlView: View {
-  @ObservedObject var viewModel = ControlViewModel()
-   
+  @StateObject var viewModel = ControlViewModel()
+  @Environment(\.scenePhase) var scenePhase
+  
   var body: some View {
     VStack {
       
@@ -32,49 +33,107 @@ struct ControlView: View {
       }
       
       Spacer()
-
-      // Focus mode selection and indication area
-      // Red circles emulate red LEDs on hardware device.
-      Text("Focus Mode").bold()
-      Picker(selection: $viewModel.focusMode,
-             label: Text("???")) {
-        Text("Course").tag(FocusMode.course)
-        Text("Medium").tag(FocusMode.medium)
-        Text("Fine").tag(FocusMode.fine)
-      }
-      .pickerStyle(.segmented)
       
-      Spacer()
-
-      // Focus control area - BIG buttons simplify focusing
-      // while looking through telescope and not at UI.
-      Text("Adjust Focus").bold()
-      HStack {
-        Button("\nCounter\nClockwise\n") {
-          heavyBump()
-          viewModel.updateMotorCommandCCW()}
-        Spacer()
-        Button("\nClockwise\n\n") {
-          softBump()
-          viewModel.updateMotorCommandCW()
+      //XLView(viewModel: viewModel)
+      VStack{
+        Text("XL Data").bold()
+        Text("X: \(viewModel.xlData.x)")
+        Text("Y: \(viewModel.xlData.y)")
+        Text("Z: \(viewModel.xlData.z)")
+        HStack{
+          Button("Update"){
+            softBump()
+            viewModel.reportUiActive()
+            viewModel.requestCurrentXl()
+          }
+          Button("Start"){
+            softBump()
+            viewModel.reportUiActive()
+            viewModel.startXlStream()
+          }
+          Button("Stop"){
+            softBump()
+            viewModel.reportUiActive()
+            viewModel.stopXlStream()
+          }
+        }
+        HStack{
+          Button("Disconnect"){
+            softBump()
+            viewModel.disconnect()
+          }
+          Button("Reconnect"){
+            softBump()
+            viewModel.reportUiActive()
+            viewModel.reconnect()
+          }
         }
       }
-      .foregroundColor(.white)
-      .buttonStyle(.bordered)
+      
+      Spacer()
+      
+      // Focus mode selection and indication area
+      // Red circles emulate red LEDs on hardware device.
+      VStack {
+        Text("Focus Mode").bold()
+        Picker(selection: $viewModel.focusMode,
+               label: Text("???")) {
+          Text("Course").tag(FocusMode.course)
+          Text("Medium").tag(FocusMode.medium)
+          Text("Fine").tag(FocusMode.fine)
+        } .pickerStyle(.segmented)
+          .onChange(of: viewModel.focusMode) { picker in
+            softBump()
+            viewModel.reportUiActive()
+           }
+      }
+      Spacer()
+      
+      // Focus control area - BIG buttons simplify focusing
+      // while looking through telescope and not at UI.
+      VStack{
+        Text("Adjust Focus").bold()
+        HStack {
+          Button("\nCounter\nClockwise\n") {
+            heavyBump() // feel different
+            viewModel.reportUiActive()
+            viewModel.updateMotorCommandCCW()}
+          Spacer()
+          Button("\nClockwise\n\n") {
+            softBump()
+            viewModel.reportUiActive()
+            viewModel.updateMotorCommandCW()
+          }
+        }
+      }
     }
-     
+    .onChange(of: scenePhase) { newPhase in
+      if newPhase == .active {
+        viewModel.reconnect()
+      } else if newPhase == .inactive {
+        viewModel.disconnect()
+      } else if newPhase == .background {
+        viewModel.disconnect()
+      }
+    }
+    .preferredColorScheme(.dark)
+    .foregroundColor(.white)
+    .buttonStyle(.bordered)
+    .controlSize(.large)
+    .font(.title)
+    .colorMultiply(.red) // turn all whites to reds
+    
     .onAppear{
       viewModel.focusMotorInit()
-
+      
       //Change picker font size
       UISegmentedControl.appearance().setTitleTextAttributes(
         [.font : UIFont.preferredFont(forTextStyle: .title1)],
         for: .normal)
-
-    }.preferredColorScheme(.dark)
-    .controlSize(.large)
-    .font(.title)
-    .colorMultiply(.red) // turn all whites to reds
+    }
+    .onShake {
+      viewModel.reconnect()
+    }
   }
   
   func heavyBump(){
@@ -86,13 +145,13 @@ struct ControlView: View {
     let haptic = UIImpactFeedbackGenerator(style: .soft)
     haptic.impactOccurred()
   }
-
+  
 }
 
 
 struct MainView_Previews: PreviewProvider {
   static var previews: some View {
-      ControlView()
+    ControlView()
       .previewDevice(PreviewDevice(rawValue: "iPhone Xs"))
   }
 }

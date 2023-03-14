@@ -12,6 +12,13 @@
 //  3. bleWrite - to write data to a Peripheral
 //  4. bleRead - to initiate a noWait read from Peripheral.
 
+// This approach requires the wizard to be modified for each DataType to be bleRead.
+// Haven't found a Generic approach (similer to func bleWrite<WriteType>) for bleRead
+// 1. Add a private var readResponderReadType dictionary
+// 2. Add bleRead(_ uuid: CBUUID, onReadResult: @escaping (ReadType)->Void) and/or
+//    setNotify(_ notify_uuid: CBUUID, onReadResult: @escaping (ReadType)->Void)
+// 3. Modify func peripheral(_ didUpdateValueFor) to call correct responder by UUID
+
 import CoreBluetooth
 import UIKit
 
@@ -31,8 +38,11 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
   private var service_uuid: CBUUID     // UUID of desired service
   private var ble_data_uuids: [CBUUID]  // UUID for each BLE data value
  
-  private var dataDictionary: [CBUUID: CBCharacteristic?] = [:] // uuid to characteristic mapping
-  private var readResponderDictionary: [CBUUID: (Int32)->Void] = [:]
+  private var characteristicDictionary: [CBUUID: CBCharacteristic?] = [:] // uuid to characteristic mapping
+
+  // need readResponder dictionary for each data type that will be read over ble
+  private var readRespondersInt32: [CBUUID: (Int32)->Void] = [:]
+  private var readResponderXlData: [CBUUID: (XlData)->Void] = [:]
 
   // Core Bluetooth variables
   private var cbCentralManager       : CBCentralManager!
@@ -47,6 +57,18 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
   // Called by derived class to initialize BLE communication
   public func start() {
     cbCentralManager = CBCentralManager(delegate: self, queue: nil)
+  }
+  
+  public func disconnect() {
+    if let focusMotor = focusMotorPeripheral {
+      delegate?.reportBleServiceDisconnected()
+      cbCentralManager.cancelPeripheralConnection(focusMotor)
+    }
+  }
+  
+  public func reconnect() {
+    delegate?.reportBleScanning()
+    cbCentralManager.scanForPeripherals(withServices: [service_uuid], options: nil)
   }
 
 //MARK:- CBCentralManagerDelegate
@@ -93,9 +115,6 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
       print(e.localizedDescription)
     }
 
-    cbCentralManager.scanForPeripherals(withServices: [service_uuid],
-                                        options: nil)
-
     delegate?.reportBleServiceDisconnected()
   }
 
@@ -110,7 +129,7 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
       print(e.localizedDescription)
       return
     }
-
+    
     if let services = peripheral.services {
       for service in services {
         peripheral.discoverCharacteristics(ble_data_uuids, for: service)
@@ -132,47 +151,12 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // Create a dictionary to find characteristics, via UUID
     if let characteristic = service.characteristics {
       for characteristic in characteristic {
-        dataDictionary[characteristic.uuid] = characteristic
+        characteristicDictionary[characteristic.uuid] = characteristic
       }
     }
     delegate?.reportBleServiceCharaceristicsScanned()
   }
   
-//MARK:- Write(UUID) and Read(UUID) calls
-
-  // Called by derived class to write single Int32 to BLE
-  func bleWrite(_ write_uuid: CBUUID, writeData: Int32) {
-    if let write_characteristic = dataDictionary[write_uuid] {
-      let data = Data(bytes: [writeData], count: 4) // Int32 writeData is 4 bytes
-      focusMotorPeripheral?.writeValue(data,
-                                       for: write_characteristic!,
-                                       type: .withoutResponse)
-    }
-  }
-  
-  // Called by derived class to write a FocusMsg struct to BLE
-  func bleWrite(_ write_uuid: CBUUID, focusMsg: FocusMsg) {
-    if let write_characteristic = dataDictionary[write_uuid] {
-      let data = Data(bytes: [focusMsg], count: 8) // Int32 writeData is 4 bytes
-      focusMotorPeripheral?.writeValue(data,
-                                       for: write_characteristic!,
-                                       type: .withoutResponse)
-    }
-  }
-  
-  
-  enum BluetoothReadError: LocalizedError {
-    case characteristicNotFound
-  }
-  
-  func bleRead(uuid: CBUUID, onReadResult: @escaping (Int32)->Void) throws {
-    guard let read_characteristic = dataDictionary[uuid] else {      // find characteristic
-      throw BluetoothReadError.characteristicNotFound
-    }
-    focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
-    readResponderDictionary[uuid] = onReadResult              // handle data when read completes
-  }
-
   // Called by peripheral.readValue,
   // or after updates if using peripheral.setNotifyValue
   func peripheral(_ peripheral: CBPeripheral,
@@ -184,19 +168,100 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
       print(e.localizedDescription)
       return
     }
-
-    // assume all read values are Int32
-    // - else require each responder to perform appropriate .getBytes mapping
-    var readData:Int32 = 0
-    // Copy Data buffer to Int32
-    if let data = characteristic.value {
-      (data as NSData).getBytes(&readData, length:4)
-    }
     
-    // call UUID's responder with the Int32 Data
-    if let responder = readResponderDictionary[characteristic.uuid] {
-      responder(readData)
+    // Select the read responder based on the UUID and readResponderType available
+    if characteristic.uuid.uuidString.compare("828b0005-046a-42c7-9c16-00ca297e95eb",
+                                              options: .caseInsensitive) == .orderedSame
+    {
+      var xlData = XlData(x: 0.0, y: 0.0, z: 0.0)
+
+      // Copy Data buffer to XlDataStruct
+      if let dataBytes = characteristic.value {
+        (dataBytes as NSData).getBytes(&xlData,
+                                       length: MemoryLayout<XlData>.size)
+      }
+      
+      // call UUID's responder with the XlData structure
+      if let responder = readResponderXlData[characteristic.uuid] {
+        responder(xlData)
+      }
+    }
+    else // all other read values are Int32
+    {
+      var readData:Int32 = 0
+      // Copy Data buffer to Int32
+      if let dataBytes = characteristic.value {
+        (dataBytes as NSData).getBytes(&readData,
+                                       length: MemoryLayout<Int32>.size)
+      }
+      
+      // call UUID's responder with the Int32 data
+      if let responder = readRespondersInt32[characteristic.uuid] {
+        responder(readData)
+      }
     }
   }
 
+  //MARK:- bleWrite(UUID), bleRead(UUID) and setNotify(UUID) functions
+  // Need a bleRead and bleNotify for each data type to be read over ble
+
+  // Called by derived class to write single WriteType data item to BLE
+  func bleWrite<WriteType>(_ write_uuid: CBUUID, writeData: WriteType) {
+    if let write_characteristic = characteristicDictionary[write_uuid] {
+      let data = Data(bytes: [writeData], count: MemoryLayout<WriteType>.size)
+      focusMotorPeripheral?.writeValue(data,
+                                       for: write_characteristic!,
+                                       type: .withoutResponse)
+    }
+  }
+  
+  // THIS FAILED - couldn't assign (T)->Void closure to (Any)->Void responder [:]
+  //               example error: Can't assign (Int32)->Void to ((Any)->Void)?
+  //             - Alternatice is a bleRead for each readDataType
+  //private var readResponder: [CBUUID: (Any)->Void] = [:] // above in class def
+  //  func bleRead<T>(uuid: CBUUID, onReadResult: @escaping (T)->Void) {
+  //    readResponder[uuid] = onReadResult  // handle data when read completes
+  //    if let read_characteristic = dataDictionary[uuid] { // find characteristic
+  //      focusMotorPeripheral?.readValue(for: read_characteristic!) // issue the read
+  //    }
+  //  }
+
+  func bleRead(_ uuid: CBUUID,
+               onReadResult: @escaping (Int32)->Void) {
+
+    readRespondersInt32[uuid] = onReadResult  // handle data when read completes
+
+    if let int32Characteristic = characteristicDictionary[uuid] { // find characteristic
+      if let peripheral = focusMotorPeripheral {
+        peripheral.readValue(for: int32Characteristic!) // issue the read
+      }
+    }
+  }
+
+  func bleRead(_ uuid: CBUUID,
+               onReadResult: @escaping (XlData)->Void) {
+    
+    readResponderXlData[uuid] = onReadResult  // handle data when read completes
+
+    if let xlDataCharacteristic = characteristicDictionary[uuid] { // find characteristic
+      if let peripheral = focusMotorPeripheral {
+        peripheral.readValue(for: xlDataCharacteristic!) // issue the read
+      }
+    }
+  }
+
+  func setNotify(_ uuid: CBUUID,
+                 onReadResult: @escaping (XlData)->Void) {
+
+    // Save closure to execute upon Notification (peripheral write complete)
+    readResponderXlData[uuid] = onReadResult
+
+    // Look up the Characteristic, and enable nofication
+    if let notifyCharacteristic = characteristicDictionary[uuid] {
+      if let peripheral = focusMotorPeripheral {
+        peripheral.setNotifyValue(true, for: notifyCharacteristic!);
+      }
+    }
+  }
+  
 }
