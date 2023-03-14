@@ -190,7 +190,7 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
     } else {
       reconnect()
       DispatchQueue.main.asyncAfter(deadline: .now() + RECONNECT_DELAY_SEC) {
-        self.updateMotorCommandCW()
+        self.updateMotorCommandCW() // reissue command after enough time to connect
       }
     }
   }
@@ -204,8 +204,7 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
     } else {
       reconnect()
       DispatchQueue.main.asyncAfter(deadline: .now() + RECONNECT_DELAY_SEC) {
-        self.updateMotorCommandCCW()
-        print("Try Again")
+        self.updateMotorCommandCCW() // reissue command after enough time to connect
       }
     }
   }
@@ -215,6 +214,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
       wizard.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_READ.rawValue,
                                                 val: 0))
+    } else {
+      reconnect()
+      DispatchQueue.main.asyncAfter(deadline: .now() + RECONNECT_DELAY_SEC) {
+        self.requestCurrentXl() // reissue command after enough time to connect
+      }
     }
   }
   
@@ -223,6 +227,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
       wizard.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_START.rawValue,
                                                 val: 0))
+    } else {
+      reconnect()
+      DispatchQueue.main.asyncAfter(deadline: .now() + RECONNECT_DELAY_SEC) {
+        self.startXlStream() // reissue command after enough time to connect
+      }
     }
   }
 
@@ -231,6 +240,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
       wizard.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_STOP.rawValue,
                                                 val: 0))
+    } else {
+      reconnect()
+      DispatchQueue.main.asyncAfter(deadline: .now() + RECONNECT_DELAY_SEC) {
+        self.stopXlStream() // reissue command after enough time to connect
+      }
     }
   }
   
