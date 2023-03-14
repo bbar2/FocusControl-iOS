@@ -9,7 +9,7 @@ import SwiftUI
 
 // Stuff to make onShake work.  Blindly copied from internet.
 
-// The notification we'll send when a shake gesture happens.
+// The notification to send when a shake gesture happens.
 extension UIDevice {
   static let deviceDidShakeNotification = Notification.Name(rawValue: "deviceDidShakeNotification")
 }

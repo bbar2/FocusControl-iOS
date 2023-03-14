@@ -25,13 +25,15 @@ struct ControlView: View {
     VStack {
       
       // App Title and BLE connection status area
-      // Yellow circle emulates yellow LED on hardware focus control
+      // Yellow title emulates yellow LED on hardware focus control
+      VStack {
       Text("Focus Control").bold()
-      HStack{
-        Text("Status: ")
-        Text(viewModel.statusString)
-      }
-      
+        HStack{
+          Text("Status: ")
+          Text(viewModel.statusString)
+        }
+      }.colorMultiply(viewModel.bleIsReady() ? .red : .yellow)
+
       Spacer()
       
       //XLView(viewModel: viewModel)
@@ -68,7 +70,7 @@ struct ControlView: View {
             viewModel.reconnect()
           }
         }
-      }
+      }.colorMultiply(.red)
       
       Spacer()
       
@@ -86,7 +88,7 @@ struct ControlView: View {
             softBump()
             viewModel.reportUiActive()
            }
-      }
+      }.colorMultiply(.red)
       Spacer()
       
       // Focus control area - BIG buttons simplify focusing
@@ -105,7 +107,7 @@ struct ControlView: View {
             viewModel.updateMotorCommandCW()
           }
         }
-      }
+      }.colorMultiply(.red)
     }
     .onChange(of: scenePhase) { newPhase in
       if newPhase == .active {
@@ -121,7 +123,6 @@ struct ControlView: View {
     .buttonStyle(.bordered)
     .controlSize(.large)
     .font(.title)
-    .colorMultiply(.red) // turn all whites to reds
     
     .onAppear{
       viewModel.focusMotorInit()
@@ -147,7 +148,6 @@ struct ControlView: View {
   }
   
 }
-
 
 struct MainView_Previews: PreviewProvider {
   static var previews: some View {

@@ -47,7 +47,7 @@ class BleWizard: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
   // Core Bluetooth variables
   private var cbCentralManager       : CBCentralManager!
   private var focusMotorPeripheral   : CBPeripheral?
-
+  
   init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
     self.service_uuid = serviceUUID
     self.ble_data_uuids = bleDataUUIDs
