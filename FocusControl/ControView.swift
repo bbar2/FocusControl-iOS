@@ -27,88 +27,92 @@ struct ControlView: View {
       // App Title and BLE connection status area
       // Yellow title emulates yellow LED on hardware focus control
       VStack {
-      Text("Focus Control").bold()
+        Text("Focus Control").bold()
         HStack{
           Text("Status: ")
           Text(viewModel.statusString)
         }
       }.colorMultiply(viewModel.bleIsReady() ? .red : .yellow)
-
-      Spacer()
-      
-      //XLView(viewModel: viewModel)
-      VStack{
-        Text("XL Data").bold()
-        Text("X: \(viewModel.xlData.x)")
-        Text("Y: \(viewModel.xlData.y)")
-        Text("Z: \(viewModel.xlData.z)")
-        HStack{
-          Button("Update"){
-            softBump()
-            viewModel.reportUiActive()
-            viewModel.requestCurrentXl()
-          }
-          Button("Start"){
-            softBump()
-            viewModel.reportUiActive()
-            viewModel.startXlStream()
-          }
-          Button("Stop"){
-            softBump()
-            viewModel.reportUiActive()
-            viewModel.stopXlStream()
-          }
-        }
-        HStack{
-          Button("Disconnect"){
-            softBump()
-            viewModel.disconnect()
-          }
-          Button("Reconnect"){
-            softBump()
-            viewModel.reportUiActive()
-            viewModel.reconnect()
-          }
-        }
-      }.colorMultiply(.red)
       
       Spacer()
       
-      // Focus mode selection and indication area
-      // Red circles emulate red LEDs on hardware device.
       VStack {
-        Text("Focus Mode").bold()
-        Picker(selection: $viewModel.focusMode,
-               label: Text("???")) {
-          Text("Course").tag(FocusMode.course)
-          Text("Medium").tag(FocusMode.medium)
-          Text("Fine").tag(FocusMode.fine)
-        } .pickerStyle(.segmented)
-          .onChange(of: viewModel.focusMode) { picker in
-            softBump()
-            viewModel.reportUiActive()
-           }
-      }.colorMultiply(.red)
-      Spacer()
-      
-      // Focus control area - BIG buttons simplify focusing
-      // while looking through telescope and not at UI.
-      VStack{
-        Text("Adjust Focus").bold()
-        HStack {
-          Button("\nCounter\nClockwise\n") {
-            heavyBump() // feel different
-            viewModel.reportUiActive()
-            viewModel.updateMotorCommandCCW()}
-          Spacer()
-          Button("\nClockwise\n\n") {
-            softBump()
-            viewModel.reportUiActive()
-            viewModel.updateMotorCommandCW()
+        //XLView(viewModel: viewModel)
+        VStack{
+          Text("XL Data").bold()
+          Text("X: \(viewModel.xlData.x)")
+          Text("Y: \(viewModel.xlData.y)")
+          Text("Z: \(viewModel.xlData.z)")
+          HStack{
+            Button("Update"){
+              softBump()
+              viewModel.reportUiActive()
+              viewModel.requestCurrentXl()
+            }
+            Button("Start"){
+              softBump()
+              viewModel.reportUiActive()
+              viewModel.startXlStream()
+            }
+            Button("Stop"){
+              softBump()
+              viewModel.reportUiActive()
+              viewModel.stopXlStream()
+            }
+          }
+          HStack{
+            Button("Disconnect"){
+              softBump()
+              viewModel.disconnect()
+            }
+            Button("Reconnect"){
+              softBump()
+              viewModel.reportUiActive()
+              viewModel.reconnect()
+            }
           }
         }
-      }.colorMultiply(.red)
-    }
+        
+        Spacer()
+        
+        // Focus mode selection and indication area
+        // Red circles emulate red LEDs on hardware device.
+        VStack {
+          Text("Focus Mode").bold()
+          Picker(selection: $viewModel.focusMode,
+                 label: Text("???")) {
+            Text("Course").tag(FocusMode.course)
+            Text("Medium").tag(FocusMode.medium)
+            Text("Fine").tag(FocusMode.fine)
+          } .pickerStyle(.segmented)
+            .onChange(of: viewModel.focusMode) { picker in
+              softBump()
+              viewModel.reportUiActive()
+            }
+        }
+        Spacer()
+        
+        // Focus control area - BIG buttons simplify focusing
+        // while looking through telescope and not at UI.
+        VStack{
+          Text("Adjust Focus").bold()
+          HStack {
+            Button("\nCounter\nClockwise\n") {
+              heavyBump() // feel different
+              viewModel.reportUiActive()
+              viewModel.updateMotorCommandCCW()}
+            Spacer()
+            Button("\nClockwise\n\n") {
+              softBump()
+              viewModel.reportUiActive()
+              viewModel.updateMotorCommandCW()
+            }
+          }
+        }
+      } // Vstack that is always Red
+      .colorMultiply(Color(red:159/255, green: 0, blue: 0))
+      
+    } // top level VStack
     .onChange(of: scenePhase) { newPhase in
       if newPhase == .active {
         viewModel.reconnect()

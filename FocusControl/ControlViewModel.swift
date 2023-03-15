@@ -80,14 +80,14 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   @Published var statusString = "Not Connected"
   
-  // updated by BLE closure
+  // updated by Notify using BLE closure
   @Published var xlData = XlData(x: 0.0, y: 0.0, z: 0.0)
   
   @Published var focusMode = FocusMode.medium
   
   private var bleState = BleCentralState.disconnected
   
-  // Focus Service procides focus motor control and focus motor accelerations
+  // Focus Service provides focus motor control and focus motor accelerations
   private let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
   
   // Parameter Characteristic UUIDs
@@ -131,13 +131,13 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
     }
   }
   
-  // if called while already .ready, upReady will not be executed
+  // if called while already .ready, uponReady will not be executed
   func reconnect(uponReady :(()->Void)? = nil) {
     if (bleState == .disconnected) {
       wizard.reconnect()
     }
 
-    // Queue uponReady closure if .disconnected or .connecting
+    // Store uponReady closure if .disconnected or .connecting
     if (bleState != .ready) {
       if let action = uponReady {
         uponBleReadyAction = action
