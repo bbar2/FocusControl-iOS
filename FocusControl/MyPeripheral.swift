@@ -21,27 +21,31 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
   
   private var service_uuid: CBUUID     // UUID of desired service
   private var ble_data_uuids: [CBUUID]  // UUID for each BLE data value
- 
-  private var peripheral: CBPeripheral?
-  private var characteristicDictionary: [CBUUID: CBCharacteristic?] = [:] // uuid to characteristic mapping
-
+  
+  // Dictionaries to look up characteristics and responders by UUID
+  private var characteristicDictionary: [CBUUID: CBCharacteristic?] = [:]
   private var readResponder: [CBUUID: (Data)->Void] = [:]
-
+  
+  private var cbPeripheral: CBPeripheral?
+  var peripheral: CBPeripheral? {
+    get {
+      return cbPeripheral// ?? nil
+    }
+    set {
+      cbPeripheral = newValue
+      cbPeripheral!.delegate = self
+    }
+  }
+  
   init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
     self.service_uuid = serviceUUID
     self.ble_data_uuids = bleDataUUIDs
-    peripheral = nil
+    cbPeripheral = nil
     super.init()
   }
   
-  func setPeripheral(_ newPeripheral: CBPeripheral) {
-    peripheral = newPeripheral
-    peripheral!.delegate = self
-  }
-  func getPeripheral() -> CBPeripheral? {
-    return peripheral
-  }
-    
+  //MARK: CBPeripheralDelegate Methods
+  
   // Once service found, look for specific parameter characteristics
   func peripheral(_ peripheral: CBPeripheral,
                   didDiscoverServices error: Error?)
@@ -51,7 +55,6 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
       print(e.localizedDescription)
       return
     }
-    print("FMP didDiscoverServices")
     if let services = peripheral.services {
       for service in services {
         peripheral.discoverCharacteristics(ble_data_uuids, for: service)
@@ -69,7 +72,6 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
       print(e.localizedDescription)
       return
     }
-    print("FMP didDiscoverCharacteristics")
     
     // Create a dictionary to find characteristics, via UUID
     if let characteristics = service.characteristics {
@@ -98,65 +100,74 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
     }
   }
   
-  //MARK:- bleWrite(UUID), bleRead(UUID) and setNotify(UUID) functions
+  //MARK: My BLE IO Methods - bleWrite(UUID), bleRead(UUID) and setNotify(UUID)
   
   // Write single WriteType data item to BLE
   func bleWrite<WriteType>(_ write_uuid: CBUUID, writeData: WriteType) {
     if let write_characteristic = characteristicDictionary[write_uuid] {
       let data = Data(bytes: [writeData], count: MemoryLayout<WriteType>.size)
-      peripheral?.writeValue(data,
+      cbPeripheral?.writeValue(data,
                              for: write_characteristic!,
                              type: .withoutResponse)
     }
   }
   
+  // Example bleRead or setNotify closure. Copy and change xlData to any data item
+  // focusMotor.setNotify(ACCEL_XYZ_UUID) { [weak self] (buffer:Data)->Void in
+  //   let numBytes = min(buffer.count, MemoryLayout.size(ofValue: self!.xlData))
+  //   withUnsafeMutableBytes(of: &self!.xlData) { pointer in
+  //     _ = buffer.copyBytes(to:pointer, from:0..<numBytes)
+  //   }
+  
   // Issue a nowait BLE read
   // Closure copies Characterstic.value:Data to application data type.
   func bleRead(_ uuid: CBUUID,
                onReadResult: @escaping (Data)->Void) {
-
+    
     readResponder[uuid] = onReadResult  // handle data when read completes
-
+    
     if let readCharacteristic = characteristicDictionary[uuid] { // find characteristic
-      if let peripheral = peripheral {
+      if let peripheral = cbPeripheral {
         peripheral.readValue(for: readCharacteristic!) // issue the read
       }
     }
   }
-
+  
   // Set a characterstic to update a local variable whenever peripheral writes
-  // Closure copies Characterstic.value:Data to application data type.
+  // Closure copies Characterstic.value:Data bytes to any application data type.
   func setNotify(_ uuid: CBUUID,
                  onReadResult: @escaping (Data)->Void) {
-
+    
     // Save closure to execute upon Notification (peripheral write complete)
     readResponder[uuid] = onReadResult
-
+    
     // Look up the Characteristic, and enable nofication
     if let notifyCharacteristic = characteristicDictionary[uuid] {
-      if let peripheral = peripheral {
+      if let peripheral = cbPeripheral {
         peripheral.setNotifyValue(true, for: notifyCharacteristic!);
       }
     }
   }
-
-  // let closure access local variable to avoid inout param in closure
+  
+  // Work in progress - simplify use by building closure in setNotify.
+  // if this works, bleRead can be modified similarly.
   func setNotify3<ReadType>(_ uuid: CBUUID, readData: inout ReadType) {
     
     var localCopy = readData
+    
     readResponder[uuid] = { (buffer:Data)->Void in
       _ = withUnsafeMutableBytes(of:  &localCopy) { pointer in
         buffer.copyBytes(to:pointer, from:0..<buffer.count)
       }
-//      readData = localCopy // need this to make it work
+      //      readData = localCopy // need this to make it work
     }
-        
+    
     // Look up the Characteristic, and enable nofication
     if let notifyCharacteristic = characteristicDictionary[uuid] {
-      if let peripheral = peripheral {
+      if let peripheral = cbPeripheral {
         peripheral.setNotifyValue(true, for: notifyCharacteristic!);
       }
     }
   }
-    
+  
 }

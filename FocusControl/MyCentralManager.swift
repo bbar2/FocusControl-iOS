@@ -13,7 +13,7 @@ import UIKit
 protocol MyCentralManagerDelegate: AnyObject {
   func onCentralManagerStarted()
   func onCentralManagerNotAvailable()
-  func onFound(peripheral: CBPeripheral)
+  func onFound(newPeripheral: CBPeripheral)
   func onConnected(peripheral: CBPeripheral)
   func onDisconnected(peripheral: CBPeripheral)
 }
@@ -25,7 +25,6 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
   // Core Bluetooth variables
   private var cbCentralManager: CBCentralManager?
   private var service_uuid: CBUUID?
-  private var peripheralCache: CBPeripheral?
   
   // Called by derived class to initialize BLE communication
   // ToDo: Manage by class level logical
@@ -36,7 +35,6 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
   }
   
   public func findPeripheral(withService: CBUUID) {
-    print("findPeripheral withService")
     service_uuid = withService
     cbCentralManager!.scanForPeripherals(withServices: [service_uuid!], options: nil)
   }
@@ -45,7 +43,7 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
     cbCentralManager!.cancelPeripheralConnection(peripheral)
   }
   
-//MARK:- CBCentralManagerDelegate
+  //MARK: CBCentralManagerDelegate
 
   // Step 1 - Start scanning for BLE DEVICE advertising required SERVICE
   // Must issue scanForPeripherals(withServices: options:) to continue connection process
@@ -66,20 +64,15 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
                       rssi RSSI: NSNumber)
   {
     cbCentralManager!.stopScan()
-    print("CM didDiscover Peripheral")
-    print("peripheral.name \(discoveredPeripheral.name ?? "NoName")")
-    delegate?.onFound(peripheral: discoveredPeripheral)
+    delegate?.onFound(newPeripheral: discoveredPeripheral)
 
     cbCentralManager!.connect(discoveredPeripheral, options: nil)
-    print("CM issued connect")
   }
   
   // Step 3 - Once connected to peripheral, Find desired service
   func centralManager(_ central: CBCentralManager,
                       didConnect connectedPeripheral: CBPeripheral)
   {
-    print("CM didConnect \(connectedPeripheral.name ?? "NN")")
-    print("service_uuid = \(service_uuid?.uuidString ?? "no UUID String")")
     delegate?.onConnected(peripheral: connectedPeripheral)
 
     connectedPeripheral.discoverServices([service_uuid!]) // already know it has it!

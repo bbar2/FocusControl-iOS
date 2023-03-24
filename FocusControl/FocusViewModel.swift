@@ -45,14 +45,6 @@ enum FocusMode:Int32 {
   case fine   = 2
 }
 
-// Focus Service provides focus motor control and focus motor accelerations
-let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
-
-// Parameter Characteristic UUIDs
-let FOCUS_MSG_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
-let ACCEL_XYZ_UUID = CBUUID(string: "828b0005-046a-42c7-9c16-00ca297e95eb")
-
-
 class FocusViewModel : MyCentralManagerDelegate,
                        MyPeripheralDelegate,
                        ObservableObject  {
@@ -63,18 +55,21 @@ class FocusViewModel : MyCentralManagerDelegate,
     case connecting
     case ready
   }
-  
+
+  // Acceleration Structure received from Focus Motor
   struct XlData {
     var x: Float32
     var y: Float32
     var z: Float32
   }
 
+  // Command structure sent to FocusMotor
   private struct RocketFocusMsg {
     var cmd : Int32
     var val : Int32
   }
 
+  // Commands sent to FocusMotor
   private enum CMD:Int32 {
     case STOP = 0x10  // stop execution of commands
     case INIT = 0x11  // Init, No move, set pos to 0, reply with micro_steps_per_step
@@ -86,29 +81,28 @@ class FocusViewModel : MyCentralManagerDelegate,
     case XL_STOP  = 0x17  // Central ask peripheral to stop streaming XL data
   }
 
-  // Disconnect BLE if no UI inputs for this long - allows other devices to control focus
+  // Focus Service provides focus motor control and focus motor accelerations
+  private let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
+
+  // Parameter Characteristic UUIDs
+  private let FOCUS_MSG_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
+  private let ACCEL_XYZ_UUID = CBUUID(string: "828b0005-046a-42c7-9c16-00ca297e95eb")
+
+  // Disconnect BLE if no UI inputs for this long, so other devices can control focus
   private let TIMER_DISCONNECT_SEC = 5.0
   
   @Published var statusString = "Not Connected"
-  
-  // updated by Notify using BLE closure
   @Published var xlData = XlData(x: 0.0, y: 0.0, z: 0.0)
-  
   @Published var focusMode = FocusMode.medium
-  
+  @Published var connectionLock = false // true to prevent connection timeout
+
   private var bleState = BleCentralState.off
-    
   private let centralManager: MyCentralManager
-  
   private let focusMotor: MyPeripheral
-    
+  private var uponBleReadyAction : (()->Void)?
+
   private var connectionTimer = Timer()
   private var uiActive = false; // Set by user action, reset by connection timer
-  @Published var connectionLock = false // true to prevent connection timeout
-  
-//  private var focusMotor: CBPeripheral
-   
-  private var uponBleReadyAction : (()->Void)?
   
   init() {
     centralManager = MyCentralManager()
@@ -118,11 +112,6 @@ class FocusViewModel : MyCentralManagerDelegate,
     uponBleReadyAction = nil
     centralManager.delegate = self
     focusMotor.delegate = self
-    print(".delegate(s) = FocusViewModel")
-  }
-  
-  func bleIsReady() -> Bool {
-    return bleState == .ready
   }
   
   // Called once by ViewController to initialize FocusMotorController
@@ -136,12 +125,8 @@ class FocusViewModel : MyCentralManagerDelegate,
   func initViewModel(){
   }
   
-  func disconnectBle() {
-    if (bleState != .disconnected) {
-      if let peripheral = focusMotor.getPeripheral() {
-        centralManager.disconnect(peripheral: peripheral)
-      }
-    }
+  func bleIsReady() -> Bool {
+    return bleState == .ready
   }
   
   func connectBle(uponReady :(()->Void)? = nil) {
@@ -151,6 +136,14 @@ class FocusViewModel : MyCentralManagerDelegate,
     }
     if let action = uponReady{
       uponBleReadyAction = action
+    }
+  }
+  
+  func disconnectBle() {
+    if (bleState != .disconnected) {
+      if let fmp = focusMotor.peripheral {
+        centralManager.disconnect(peripheral: fmp)
+      }
     }
   }
   
@@ -164,83 +157,6 @@ class FocusViewModel : MyCentralManagerDelegate,
     }
   }
   
-  // BLE Wizard Delegate "report" callbacks
-  func onCentralManagerStarted() {
-    bleState = .disconnected
-    statusString = "Ready ..."
-    print("onCentralManagerStarted")
-    connectBle(); // First connection, upon BLE initization
-  }
-  
-  func onCentralManagerNotAvailable() {
-    bleState = .disconnected
-    statusString = "BLE Not Available"
-  }
-  
-  func onFound(peripheral: CBPeripheral){
-    statusString = "Focus Motor Found"
-    focusMotor.setPeripheral(peripheral)
-    peripheral.delegate = focusMotor
-    print("onFound")
-  }
-  
-  // BLE Connected, but have not yet scanned for services and characeristics
-  func onConnected(peripheral: CBPeripheral){
-    initViewModel()
-    statusString = "Connected"
-  }
-    
-  // All remote peripheral characteristics scanned - ready for IO
-  func onReady(peripheral: CBPeripheral) {
-    print("onReady called by FMP")
-
-    // Setup Notifications, to process writes from the FocusMotor peripheral
-
-    // Approach 1:  Unique closure signature for each data type.
-    // - peripheral requires access to each datatype used
-    // - peripheral(didUpdateValueFor) must match closure signature to UUID
-    // - peripheral must keep an array of closures for each data type
-    // - peripheral requires a bleRead and setNotify for each type read
-    // - Caller syntax is simple and clean
-//    focusMotor.setNotify(ACCEL_XYZ_UUID) { self.xlData = $0 }
-
-    // Approach 2: Common closure signature using Swift Data type.
-    // - peripheral(didUpdateValueFor) requires no mods for any data type
-    // - peripheral uses a common bleRead and setNotify for all data types used
-    // - Caller closure is common format for all data types, but a klunky mess.
-    // - How's this avoid approach 3's "escaping closure capture inout param" problem??
-    // - self reference to store final result, vs inout param, avoids approach 3's problem
-    focusMotor.setNotify(ACCEL_XYZ_UUID) { [weak self] (buffer:Data)->Void in
-      let numBytes = min(buffer.count, MemoryLayout.size(ofValue: self!.xlData))
-      withUnsafeMutableBytes(of: &self!.xlData) { pointer in
-        _ = buffer.copyBytes(to:pointer, from:0..<numBytes)
-      }
-    }
-    
-    // Approach 3: Use Generic inout data and construct closure in setNotify (or bleRead)
-    // - All the benefits of Approach 2, with a single Data type for stored
-    //   closures, setNofity, and bleRead
-    // - Cleanest calling format
-    // - Doesn't work due to "escaping closure capturing inout parameter"
-    // - There may be a solution with deferred copy of a local variable in setNotify3
-//    focusMotor.setNotify3(ACCEL_XYZ_UUID, readData: &xlData)
-
-    // Start timer to disconnect when UI becomes inactive
-    connectionTimer = Timer.scheduledTimer(withTimeInterval: TIMER_DISCONNECT_SEC,
-                                           repeats: true) { _ in
-      self.uiTimerHandler()
-    }
-
-    statusString = "Ready"
-    bleState = .ready
-
-    // Check for saved action to complete once BLE is ready
-    if let bleReadyAction = uponBleReadyAction {
-      bleReadyAction()
-      uponBleReadyAction = nil
-    }
-  }
-  
   // If no UI interaction for one timerInterval disconnect the BLE link.
   func uiTimerHandler() {
     if (!connectionLock && !uiActive) {
@@ -249,14 +165,7 @@ class FocusViewModel : MyCentralManagerDelegate,
     uiActive = false; // always reset ui interaction logical
   }
 
-  func onDisconnected(peripheral: CBPeripheral){
-    bleState = .disconnected;
-    initViewModel()
-    statusString = "Disconnected"
-    connectionTimer.invalidate()
-    connectionLock = false
-  }
-  
+  //MARK: UI Actions
   // Clockwise UI action
   func updateMotorCommandCW(){
     if (bleState == .ready) {
@@ -316,6 +225,87 @@ class FocusViewModel : MyCentralManagerDelegate,
       connectBle() {
         self.stopXlStream()
       }
+    }
+  }
+  
+  //MARK: MyCentralManagerDelegate
+  func onCentralManagerStarted() {
+    bleState = .disconnected
+    statusString = "Ready ..."
+    connectBle(); // First connection, upon BLE initization
+  }
+  
+  func onCentralManagerNotAvailable() {
+    bleState = .disconnected
+    statusString = "BLE Not Available"
+  }
+  
+  func onFound(newPeripheral: CBPeripheral){
+    statusString = "Focus Motor Found"
+    focusMotor.peripheral = newPeripheral
+  }
+  
+  // BLE Connected, but have not yet scanned for services and characeristics
+  func onConnected(peripheral: CBPeripheral){
+    initViewModel()
+    statusString = "Connected"
+  }
+    
+  func onDisconnected(peripheral: CBPeripheral){
+    bleState = .disconnected;
+    statusString = "Disconnected"
+    connectionTimer.invalidate()
+    connectionLock = false
+  }
+  
+  //MARK: MyPeripheralDelegate
+  // All remote peripheral characteristics scanned - ready for IO
+  func onReady(peripheral: CBPeripheral) {
+
+    // Setup Notifications, to process writes from the FocusMotor peripheral
+
+    // Approach 1:  Unique closure signature for each data type.
+    // - peripheral requires access to each datatype used
+    // - peripheral(didUpdateValueFor) must match closure signature to UUID
+    // - peripheral must keep an array of closures for each data type
+    // - peripheral requires a bleRead and setNotify for each type read
+    // - Caller syntax is simple and clean
+//    focusMotor.setNotify(ACCEL_XYZ_UUID) { self.xlData = $0 }
+
+    // Approach 2: Common closure signature using Swift Data type.
+    // - peripheral(didUpdateValueFor) requires no mods for any data type
+    // - peripheral uses a common bleRead and setNotify for all data types used
+    // - Caller closure is common format for all data types, but a klunky mess.
+    // - How's this avoid approach 3's "escaping closure capture inout param" problem??
+    // - self reference to store final result, vs inout param, avoids approach 3's problem
+    focusMotor.setNotify(ACCEL_XYZ_UUID) { [weak self] (buffer:Data)->Void in
+      let numBytes = min(buffer.count, MemoryLayout.size(ofValue: self!.xlData))
+      withUnsafeMutableBytes(of: &self!.xlData) { pointer in
+        _ = buffer.copyBytes(to:pointer, from:0..<numBytes)
+      }
+    }
+    
+    // Approach 3: Use Generic inout data and construct closure in setNotify (or bleRead)
+    // - All the benefits of Approach 2, with a single Data type for stored
+    //   closures, setNofity, and bleRead
+    // - Cleanest calling format
+    // - Doesn't work due to "escaping closure capturing inout parameter"
+    // - There may be a solution with deferred copy of a local variable in setNotify3
+//    focusMotor.setNotify3(ACCEL_XYZ_UUID, readData: &xlData)
+
+    // Start timer to disconnect when UI becomes inactive
+    connectionTimer = Timer.scheduledTimer(withTimeInterval: TIMER_DISCONNECT_SEC,
+                                           repeats: true) { _ in
+      self.uiTimerHandler()
+    }
+
+    statusString = "Ready"
+    bleState = .ready
+
+    // Check for saved action to complete once BLE is ready
+    if let bleReadyAction = uponBleReadyAction {
+      bleReadyAction()
+      uponBleReadyAction = nil
     }
   }
   
