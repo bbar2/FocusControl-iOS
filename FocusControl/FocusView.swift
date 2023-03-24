@@ -17,8 +17,8 @@
 
 import SwiftUI
 
-struct ControlView: View {
-  @StateObject var viewModel = ControlViewModel()
+struct FocusView: View {
+  @StateObject var viewModel = FocusViewModel()
   @Environment(\.scenePhase) var scenePhase
   
   var body: some View {
@@ -32,12 +32,43 @@ struct ControlView: View {
           Text("Status: ")
           Text(viewModel.statusString)
         }
+        if viewModel.bleIsReady() {
+          HStack{
+            Button("Disconnect"){
+              softBump()
+              viewModel.disconnectBle()
+            }
+            if viewModel.connectionLock {
+              Button(){
+                softBump()
+                viewModel.connectionLock = false
+                viewModel.reportUiActive()
+              } label: {
+                Image(systemName: "poweroff") // current state no timer
+              }
+            } else {
+              Button(){
+                softBump()
+                viewModel.connectionLock = true
+                viewModel.reportUiActive()
+              } label: {
+                Image(systemName: "timer") // current state uses timer
+              }
+            }
+          }
+        } else {
+          Button("Reconnect"){
+            softBump()
+            viewModel.connectBle()
+            viewModel.reportUiActive()
+          }
+        }
       }.colorMultiply(viewModel.bleIsReady() ? .red : .yellow)
       
       Spacer()
       
+      // Everything else is in this VStack and is red
       VStack {
-        //XLView(viewModel: viewModel)
         VStack{
           Text("XL Data").bold()
           Text("X: \(viewModel.xlData.x)")
@@ -58,17 +89,6 @@ struct ControlView: View {
               softBump()
               viewModel.reportUiActive()
               viewModel.stopXlStream()
-            }
-          }
-          HStack{
-            Button("Disconnect"){
-              softBump()
-              viewModel.disconnect()
-            }
-            Button("Reconnect"){
-              softBump()
-              viewModel.reportUiActive()
-              viewModel.reconnect()
             }
           }
         }
@@ -115,11 +135,11 @@ struct ControlView: View {
     } // top level VStack
     .onChange(of: scenePhase) { newPhase in
       if newPhase == .active {
-        viewModel.reconnect()
+        viewModel.connectBle() // TODO this accidentally issues 1st connect before started
       } else if newPhase == .inactive {
-        viewModel.disconnect()
+        viewModel.disconnectBle()
       } else if newPhase == .background {
-        viewModel.disconnect()
+        viewModel.disconnectBle()
       }
     }
     .preferredColorScheme(.dark)
@@ -137,7 +157,7 @@ struct ControlView: View {
         for: .normal)
     }
     .onShake {
-      viewModel.reconnect()
+      viewModel.connectBle()
     }
   }
   
@@ -155,7 +175,7 @@ struct ControlView: View {
 
 struct MainView_Previews: PreviewProvider {
   static var previews: some View {
-    ControlView()
+    FocusView()
       .previewDevice(PreviewDevice(rawValue: "iPhone Xs"))
   }
 }

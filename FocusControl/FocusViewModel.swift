@@ -45,20 +45,31 @@ enum FocusMode:Int32 {
   case fine   = 2
 }
 
-struct XlData {
-  var x: Float32
-  var y: Float32
-  var z: Float32
-}
+// Focus Service provides focus motor control and focus motor accelerations
+let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
 
-class ControlViewModel : BleWizardDelegate, ObservableObject  {
+// Parameter Characteristic UUIDs
+let FOCUS_MSG_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
+let ACCEL_XYZ_UUID = CBUUID(string: "828b0005-046a-42c7-9c16-00ca297e95eb")
+
+
+class FocusViewModel : MyCentralManagerDelegate,
+                       MyPeripheralDelegate,
+                       ObservableObject  {
   
   enum BleCentralState {
+    case off
     case disconnected
     case connecting
     case ready
   }
   
+  struct XlData {
+    var x: Float32
+    var y: Float32
+    var z: Float32
+  }
+
   private struct RocketFocusMsg {
     var cmd : Int32
     var val : Int32
@@ -77,7 +88,7 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   // Disconnect BLE if no UI inputs for this long - allows other devices to control focus
   private let TIMER_DISCONNECT_SEC = 5.0
-
+  
   @Published var statusString = "Not Connected"
   
   // updated by Notify using BLE closure
@@ -85,28 +96,29 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   @Published var focusMode = FocusMode.medium
   
-  private var bleState = BleCentralState.disconnected
-  
-  // Focus Service provides focus motor control and focus motor accelerations
-  private let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
-  
-  // Parameter Characteristic UUIDs
-  private let FOCUS_MSG_UUID = CBUUID(string: "828b0001-046a-42c7-9c16-00ca297e95eb")
-  private let ACCEL_XYZ_UUID = CBUUID(string: "828b0005-046a-42c7-9c16-00ca297e95eb")
+  private var bleState = BleCentralState.off
     
-  private let wizard: BleWizard
+  private let centralManager: MyCentralManager
+  
+  private let focusMotor: MyPeripheral
     
   private var connectionTimer = Timer()
   private var uiActive = false; // Set by user action, reset by connection timer
+  @Published var connectionLock = false // true to prevent connection timeout
+  
+//  private var focusMotor: CBPeripheral
    
   private var uponBleReadyAction : (()->Void)?
   
   init() {
-    self.wizard = BleWizard(
-      serviceUUID: FOCUS_SERVICE_UUID,
-      bleDataUUIDs: [FOCUS_MSG_UUID, ACCEL_XYZ_UUID])
-    wizard.delegate = self
+    centralManager = MyCentralManager()
+    focusMotor = MyPeripheral(serviceUUID: FOCUS_SERVICE_UUID,
+                              bleDataUUIDs: [FOCUS_MSG_UUID,
+                                             ACCEL_XYZ_UUID])
     uponBleReadyAction = nil
+    centralManager.delegate = self
+    focusMotor.delegate = self
+    print(".delegate(s) = FocusViewModel")
   }
   
   func bleIsReady() -> Bool {
@@ -115,8 +127,7 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   // Called once by ViewController to initialize FocusMotorController
   func focusMotorInit() {
-    bleState = .connecting
-    wizard.start()
+    centralManager.start()
     statusString = "Searching for Focus-Motor ..."
     initViewModel()
   }
@@ -125,23 +136,21 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   func initViewModel(){
   }
   
-  func disconnect() {
+  func disconnectBle() {
     if (bleState != .disconnected) {
-      wizard.disconnect()
+      if let peripheral = focusMotor.getPeripheral() {
+        centralManager.disconnect(peripheral: peripheral)
+      }
     }
   }
   
-  // if called while already .ready, uponReady will not be executed
-  func reconnect(uponReady :(()->Void)? = nil) {
+  func connectBle(uponReady :(()->Void)? = nil) {
     if (bleState == .disconnected) {
-      wizard.reconnect()
+      bleState = .connecting
+      centralManager.findPeripheral(withService: FOCUS_SERVICE_UUID)
     }
-
-    // Store uponReady closure if .disconnected or .connecting
-    if (bleState != .ready) {
-      if let action = uponReady {
-        uponBleReadyAction = action
-      }
+    if let action = uponReady{
+      uponBleReadyAction = action
     }
   }
   
@@ -151,35 +160,71 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
     
     // Any UI input, reconnects the BLE
     if(bleState == .disconnected) {
-      reconnect()
+      connectBle()
     }
   }
   
   // BLE Wizard Delegate "report" callbacks
-  func reportBleScanning() {
-    statusString = "Scanning ..."
+  func onCentralManagerStarted() {
+    bleState = .disconnected
+    statusString = "Ready ..."
+    print("onCentralManagerStarted")
+    connectBle(); // First connection, upon BLE initization
   }
   
-  func reportBleNotAvailable() {
+  func onCentralManagerNotAvailable() {
+    bleState = .disconnected
     statusString = "BLE Not Available"
   }
   
-  func reportBleServiceFound(){
+  func onFound(peripheral: CBPeripheral){
     statusString = "Focus Motor Found"
+    focusMotor.setPeripheral(peripheral)
+    peripheral.delegate = focusMotor
+    print("onFound")
   }
   
   // BLE Connected, but have not yet scanned for services and characeristics
-  func reportBleServiceConnected(){
+  func onConnected(peripheral: CBPeripheral){
     initViewModel()
     statusString = "Connected"
   }
     
   // All remote peripheral characteristics scanned - ready for IO
-  func reportBleServiceCharaceristicsScanned() {
+  func onReady(peripheral: CBPeripheral) {
+    print("onReady called by FMP")
+
+    // Setup Notifications, to process writes from the FocusMotor peripheral
+
+    // Approach 1:  Unique closure signature for each data type.
+    // - peripheral requires access to each datatype used
+    // - peripheral(didUpdateValueFor) must match closure signature to UUID
+    // - peripheral must keep an array of closures for each data type
+    // - peripheral requires a bleRead and setNotify for each type read
+    // - Caller syntax is simple and clean
+//    focusMotor.setNotify(ACCEL_XYZ_UUID) { self.xlData = $0 }
+
+    // Approach 2: Common closure signature using Swift Data type.
+    // - peripheral(didUpdateValueFor) requires no mods for any data type
+    // - peripheral uses a common bleRead and setNotify for all data types used
+    // - Caller closure is common format for all data types, but a klunky mess.
+    // - How's this avoid approach 3's "escaping closure capture inout param" problem??
+    // - self reference to store final result, vs inout param, avoids approach 3's problem
+    focusMotor.setNotify(ACCEL_XYZ_UUID) { [weak self] (buffer:Data)->Void in
+      let numBytes = min(buffer.count, MemoryLayout.size(ofValue: self!.xlData))
+      withUnsafeMutableBytes(of: &self!.xlData) { pointer in
+        _ = buffer.copyBytes(to:pointer, from:0..<numBytes)
+      }
+    }
     
-    // Specify closure for ACCEL_XYZ_UUID writes by remote peripheral
-    wizard.setNotify(ACCEL_XYZ_UUID) { self.xlData = $0 }
-    
+    // Approach 3: Use Generic inout data and construct closure in setNotify (or bleRead)
+    // - All the benefits of Approach 2, with a single Data type for stored
+    //   closures, setNofity, and bleRead
+    // - Cleanest calling format
+    // - Doesn't work due to "escaping closure capturing inout parameter"
+    // - There may be a solution with deferred copy of a local variable in setNotify3
+//    focusMotor.setNotify3(ACCEL_XYZ_UUID, readData: &xlData)
+
     // Start timer to disconnect when UI becomes inactive
     connectionTimer = Timer.scheduledTimer(withTimeInterval: TIMER_DISCONNECT_SEC,
                                            repeats: true) { _ in
@@ -196,30 +241,30 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
     }
   }
   
-  // If no user interaction for one timerInterval disconnect the BLE link.
+  // If no UI interaction for one timerInterval disconnect the BLE link.
   func uiTimerHandler() {
-    if (uiActive) { // if ui has been active during this timer interval
-      uiActive = false; // remain connected
-    } else {
-      disconnect()   // else disconnect ble
+    if (!connectionLock && !uiActive) {
+      disconnectBle()   // disconnect ble
     }
+    uiActive = false; // always reset ui interaction logical
   }
 
-  func reportBleServiceDisconnected(){
+  func onDisconnected(peripheral: CBPeripheral){
     bleState = .disconnected;
     initViewModel()
     statusString = "Disconnected"
     connectionTimer.invalidate()
+    connectionLock = false
   }
   
   // Clockwise UI action
   func updateMotorCommandCW(){
     if (bleState == .ready) {
-      wizard.bleWrite(FOCUS_MSG_UUID,
+      focusMotor.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.MOVE.rawValue,
                                                 val: focusMode.rawValue))
     } else {
-      reconnect() {
+      connectBle() {
         self.updateMotorCommandCW()
       }
     }
@@ -228,11 +273,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   // Counter Clockwise UI action
   func updateMotorCommandCCW(){
     if (bleState == .ready) {
-      wizard.bleWrite(FOCUS_MSG_UUID,
+      focusMotor.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.MOVE.rawValue,
                                                 val: -focusMode.rawValue))
     } else {
-      reconnect() {
+      connectBle() {
         self.updateMotorCommandCCW()
       }
     }
@@ -240,11 +285,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   func requestCurrentXl() {
     if (bleState == .ready) {
-      wizard.bleWrite(FOCUS_MSG_UUID,
+      focusMotor.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_READ.rawValue,
                                                 val: 0))
     } else {
-      reconnect() {
+      connectBle() {
         self.requestCurrentXl()
       }
     }
@@ -252,11 +297,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
   
   func startXlStream() {
     if (bleState == .ready) {
-      wizard.bleWrite(FOCUS_MSG_UUID,
+      focusMotor.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_START.rawValue,
                                                 val: 0))
     } else {
-      reconnect() {
+      connectBle() {
         self.startXlStream()
       }
     }
@@ -264,11 +309,11 @@ class ControlViewModel : BleWizardDelegate, ObservableObject  {
 
   func stopXlStream() {
     if (bleState == .ready) {
-      wizard.bleWrite(FOCUS_MSG_UUID,
+      focusMotor.bleWrite(FOCUS_MSG_UUID,
                       writeData: RocketFocusMsg(cmd: CMD.XL_STOP.rawValue,
                                                 val: 0))
     } else {
-      reconnect() {
+      connectBle() {
         self.stopXlStream()
       }
     }

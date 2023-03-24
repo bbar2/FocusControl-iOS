@@ -12,7 +12,7 @@ struct FocusControlApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ControlView()
+            FocusView()
         }
     }
 }

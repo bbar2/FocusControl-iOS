@@ -8,23 +8,25 @@
 
 /* Begin PBXBuildFile section */
 		3573D96329BFEF8F00ABE124 /* OnShake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3573D96229BFEF8F00ABE124 /* OnShake.swift */; };
-		35A9FB11277629BA008C5533 /* BleWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A9FB10277629BA008C5533 /* BleWizard.swift */; };
+		35A9FB11277629BA008C5533 /* MyCentralManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A9FB10277629BA008C5533 /* MyCentralManager.swift */; };
 		35B9E757271F5876001993AA /* FocusControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E756271F5876001993AA /* FocusControlApp.swift */; };
 		35B9E75B271F587C001993AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 35B9E75A271F587C001993AA /* Assets.xcassets */; };
 		35B9E75E271F587C001993AA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 35B9E75D271F587C001993AA /* Preview Assets.xcassets */; };
-		35B9E765271F58E1001993AA /* ControView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E764271F58E1001993AA /* ControView.swift */; };
-		35B9E769271F7404001993AA /* ControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E768271F7404001993AA /* ControlViewModel.swift */; };
+		35B9E765271F58E1001993AA /* FocusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E764271F58E1001993AA /* FocusView.swift */; };
+		35B9E769271F7404001993AA /* FocusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B9E768271F7404001993AA /* FocusViewModel.swift */; };
+		35EEAFE229C65604002F7626 /* MyPeripheral.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35EEAFE129C65604002F7626 /* MyPeripheral.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		3573D96229BFEF8F00ABE124 /* OnShake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnShake.swift; sourceTree = "<group>"; };
-		35A9FB10277629BA008C5533 /* BleWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BleWizard.swift; sourceTree = "<group>"; };
+		35A9FB10277629BA008C5533 /* MyCentralManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCentralManager.swift; sourceTree = "<group>"; };
 		35B9E753271F5876001993AA /* FocusControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35B9E756271F5876001993AA /* FocusControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusControlApp.swift; sourceTree = "<group>"; };
 		35B9E75A271F587C001993AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		35B9E75D271F587C001993AA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		35B9E764271F58E1001993AA /* ControView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControView.swift; sourceTree = "<group>"; };
-		35B9E768271F7404001993AA /* ControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlViewModel.swift; sourceTree = "<group>"; };
+		35B9E764271F58E1001993AA /* FocusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusView.swift; sourceTree = "<group>"; };
+		35B9E768271F7404001993AA /* FocusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusViewModel.swift; sourceTree = "<group>"; };
+		35EEAFE129C65604002F7626 /* MyPeripheral.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPeripheral.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,9 +60,10 @@
 			isa = PBXGroup;
 			children = (
 				35B9E756271F5876001993AA /* FocusControlApp.swift */,
-				35B9E764271F58E1001993AA /* ControView.swift */,
-				35B9E768271F7404001993AA /* ControlViewModel.swift */,
-				35A9FB10277629BA008C5533 /* BleWizard.swift */,
+				35B9E764271F58E1001993AA /* FocusView.swift */,
+				35B9E768271F7404001993AA /* FocusViewModel.swift */,
+				35EEAFE129C65604002F7626 /* MyPeripheral.swift */,
+				35A9FB10277629BA008C5533 /* MyCentralManager.swift */,
 				3573D96229BFEF8F00ABE124 /* OnShake.swift */,
 				35B9E75A271F587C001993AA /* Assets.xcassets */,
 				35B9E75C271F587C001993AA /* Preview Content */,
@@ -146,11 +149,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				35B9E765271F58E1001993AA /* ControView.swift in Sources */,
+				35B9E765271F58E1001993AA /* FocusView.swift in Sources */,
 				3573D96329BFEF8F00ABE124 /* OnShake.swift in Sources */,
-				35A9FB11277629BA008C5533 /* BleWizard.swift in Sources */,
+				35EEAFE229C65604002F7626 /* MyPeripheral.swift in Sources */,
+				35A9FB11277629BA008C5533 /* MyCentralManager.swift in Sources */,
 				35B9E757271F5876001993AA /* FocusControlApp.swift in Sources */,
-				35B9E769271F7404001993AA /* ControlViewModel.swift in Sources */,
+				35B9E769271F7404001993AA /* FocusViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
