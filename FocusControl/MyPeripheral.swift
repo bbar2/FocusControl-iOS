@@ -4,21 +4,29 @@
 //
 //  Created by Barry Bryant on 3/18/23.
 //
-// Wrapper around Core Bluetooth Peripheral.
+// Core Bluetooth Peripheral wrapper, using a CentralManager singleton.
 // Use one of these for each peripheral, then implement MyPeripheralDelegate
 // methods in the object holding a MyPeripheral object.
-// That same object is probably handling MyCentralManagar and it's delegates too.
 
 import CoreBluetooth
 
 protocol MyPeripheralDelegate: AnyObject {
-  func onReady(peripheral: CBPeripheral)
+  func onBleRunning()
+  func onBleNotAvailable()
+  func onFound()
+  func onConnected()
+  func onDisconnected()
+  func onReady()
 }
 
-class MyPeripheral :NSObject, CBPeripheralDelegate {
+class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   
   weak var delegate: MyPeripheralDelegate?
   
+  private var centralManager: MyCentralManager?
+
+  private var cbPeripheral: CBPeripheral?
+
   private var service_uuid: CBUUID     // UUID of desired service
   private var ble_data_uuids: [CBUUID]  // UUID for each BLE data value
   
@@ -26,22 +34,69 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
   private var characteristicDictionary: [CBUUID: CBCharacteristic?] = [:]
   private var readResponder: [CBUUID: (Data)->Void] = [:]
   
-  private var cbPeripheral: CBPeripheral?
-  var peripheral: CBPeripheral? {
-    get {
-      return cbPeripheral// ?? nil
-    }
-    set {
-      cbPeripheral = newValue
-      cbPeripheral!.delegate = self
+  init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
+
+    self.service_uuid = serviceUUID
+    self.ble_data_uuids = bleDataUUIDs
+
+    super.init()  // NSObject
+
+    // TODO - deal with how second MyPeripheral calls findPeripheral
+    centralManager = MyCentralManager()
+    centralManager!.delegate = self
+    centralManager!.start() // will result in onCentralManagerStarted
+  }
+  
+  func startBleConnection() {
+    centralManager!.findPeripheral(withService: service_uuid)
+  }
+  
+  func endBleConnection() {
+    if let centralManager, let cbPeripheral {
+      centralManager.disconnect(peripheral: cbPeripheral)
     }
   }
   
-  init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
-    self.service_uuid = serviceUUID
-    self.ble_data_uuids = bleDataUUIDs
-    cbPeripheral = nil
-    super.init()
+  //MARK: MyCentralManagerDelegate
+  func onCentralManagerStarted() {
+    // Don't pass to MyPeripheralDelegate, because there could be multiple peripherals
+    // maybe this sould be class method, which calls start for any number of MyPeripherals
+    // in need of startBleConnection()
+    // TODO - deal with how second MyPeripheral calls findPeripheral
+    startBleConnection()
+  }
+  
+  func onCentralManagerNotAvailable() { // peripheral
+    // Don't pass to peripheral, because there could be multiple peripherals
+  }
+  
+  // WHEN USING MULTIPLE PERIPHERALS the onFound, onConnected, and
+  // onDisconnected MyCentralManagerDelegate methods must check peripheral
+  // and pass the call to the appropriate object
+  func onDidDiscover(newPeripheral: CBPeripheral){
+    // Pass to MyPeripheralDelegate
+
+    cbPeripheral = newPeripheral
+    cbPeripheral!.delegate = self
+
+    if let myPeripheralDelegate = delegate {
+      myPeripheralDelegate.onFound()
+    }
+  }
+  
+  // BLE Connected, but have not yet scanned for services and characeristics
+  func onDidConnect(peripheral: CBPeripheral){
+    // Pass to MyPeripheralDelegate
+    if let myPeripheralDelegate = delegate {
+      myPeripheralDelegate.onConnected()
+    }
+  }
+  
+  func onDidDisconnect(peripheral: CBPeripheral){
+    // Pass to MyPeripheralDelegate
+    if let myPeripheralDelegate = delegate {
+      myPeripheralDelegate.onDisconnected()
+    }
   }
   
   //MARK: CBPeripheralDelegate Methods
@@ -79,7 +134,9 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
         characteristicDictionary[characteristic.uuid] = characteristic
       }
     }
-    delegate!.onReady(peripheral: peripheral)
+    if let myPeripheralDelegate = delegate {
+      myPeripheralDelegate.onReady()
+    }
   }
   
   // Called by peripheral.readValue,
@@ -100,15 +157,15 @@ class MyPeripheral :NSObject, CBPeripheralDelegate {
     }
   }
   
-  //MARK: My BLE IO Methods - bleWrite(UUID), bleRead(UUID) and setNotify(UUID)
+  //MARK: My BLE IO Methods - used to read and write BLE data
   
   // Write single WriteType data item to BLE
   func bleWrite<WriteType>(_ write_uuid: CBUUID, writeData: WriteType) {
     if let write_characteristic = characteristicDictionary[write_uuid] {
       let data = Data(bytes: [writeData], count: MemoryLayout<WriteType>.size)
       cbPeripheral?.writeValue(data,
-                             for: write_characteristic!,
-                             type: .withoutResponse)
+                               for: write_characteristic!,
+                               type: .withoutResponse)
     }
   }
   

@@ -24,7 +24,7 @@
 //   - XLData structure, defined in FocusMsg.h
 //   - CMD raw values, defined in FocusMsg.h
 //   - FocusMode raw values, defined in FocusMsg.h
-//   - UUID, defined in FocusUuid.h
+//   - UUID, and NAME defined in FocusUuid.h
 //
 // This app, the hardware remote control, and the MacOS Indigo apps tranmit
 //   FocusMotor commands via Bluetooth Low Energy (BLE).
@@ -45,8 +45,7 @@ enum FocusMode:Int32 {
   case fine   = 2
 }
 
-class FocusViewModel : MyCentralManagerDelegate,
-                       MyPeripheralDelegate,
+class FocusViewModel : MyPeripheralDelegate,
                        ObservableObject  {
   
   enum BleCentralState {
@@ -82,6 +81,7 @@ class FocusViewModel : MyCentralManagerDelegate,
   }
 
   // Focus Service provides focus motor control and focus motor accelerations
+  private let FOCUS_MOTOR_NAME = "FocusMotor"
   private let FOCUS_SERVICE_UUID = CBUUID(string: "828b0000-046a-42c7-9c16-00ca297e95eb")
 
   // Parameter Characteristic UUIDs
@@ -97,7 +97,6 @@ class FocusViewModel : MyCentralManagerDelegate,
   @Published var connectionLock = false // true to prevent connection timeout
 
   private var bleState = BleCentralState.off
-  private let centralManager: MyCentralManager
   private let focusMotor: MyPeripheral
   private var uponBleReadyAction : (()->Void)?
 
@@ -105,18 +104,16 @@ class FocusViewModel : MyCentralManagerDelegate,
   private var uiActive = false; // Set by user action, reset by connection timer
   
   init() {
-    centralManager = MyCentralManager()
     focusMotor = MyPeripheral(serviceUUID: FOCUS_SERVICE_UUID,
                               bleDataUUIDs: [FOCUS_MSG_UUID,
                                              ACCEL_XYZ_UUID])
     uponBleReadyAction = nil
-    centralManager.delegate = self
     focusMotor.delegate = self
   }
   
   // Called once by ViewController to initialize FocusMotorController
   func focusMotorInit() {
-    centralManager.start()
+//    centralManager.start() -- moved into MyPeripheral's init()
     statusString = "Searching for Focus-Motor ..."
     initViewModel()
   }
@@ -132,7 +129,8 @@ class FocusViewModel : MyCentralManagerDelegate,
   func connectBle(uponReady :(()->Void)? = nil) {
     if (bleState == .disconnected) {
       bleState = .connecting
-      centralManager.findPeripheral(withService: FOCUS_SERVICE_UUID)
+      focusMotor.startBleConnection()
+//      centralManager.findPeripheral(withService: FOCUS_SERVICE_UUID)
     }
     if let action = uponReady{
       uponBleReadyAction = action
@@ -141,9 +139,7 @@ class FocusViewModel : MyCentralManagerDelegate,
   
   func disconnectBle() {
     if (bleState != .disconnected) {
-      if let fmp = focusMotor.peripheral {
-        centralManager.disconnect(peripheral: fmp)
-      }
+      focusMotor.endBleConnection()
     }
   }
   
@@ -228,39 +224,56 @@ class FocusViewModel : MyCentralManagerDelegate,
     }
   }
   
-  //MARK: MyCentralManagerDelegate
-  func onCentralManagerStarted() {
+  //MARK: MyPeripheralDelegate
+  func onBleRunning() {
     bleState = .disconnected
     statusString = "Ready ..."
     connectBle(); // First connection, upon BLE initization
   }
-  
-  func onCentralManagerNotAvailable() {
+
+  func onBleNotAvailable() { // peripheral
     bleState = .disconnected
-    statusString = "BLE Not Available"
   }
-  
-  func onFound(newPeripheral: CBPeripheral){
+
+  // WHEN USING MULTIPLE PERIPHERALS the onFound, onConnected, and
+  // onDisconnected MyCentralManagerDelegate methods must check peripheral
+  // and pass the call to the appropriate object
+  func onFound(){
     statusString = "Focus Motor Found"
-    focusMotor.peripheral = newPeripheral
   }
-  
+
   // BLE Connected, but have not yet scanned for services and characeristics
-  func onConnected(peripheral: CBPeripheral){
-    initViewModel()
+  func onConnected(){
     statusString = "Connected"
   }
-    
-  func onDisconnected(peripheral: CBPeripheral){
+
+  func onDisconnected(){
     bleState = .disconnected;
     statusString = "Disconnected"
     connectionTimer.invalidate()
     connectionLock = false
   }
-  
-  //MARK: MyPeripheralDelegate
+
   // All remote peripheral characteristics scanned - ready for IO
-  func onReady(peripheral: CBPeripheral) {
+  //  func onFound(newPeripheral: CBPeripheral){
+  //    if (newPeripheral.name == FOCUS_MOTOR_NAME) {
+  //      statusString = "Focus Motor Found"
+  //      focusMotor.peripheral = newPeripheral
+  //    }
+  //  }
+  //
+  //  // BLE Connected, but have not yet scanned for services and characeristics
+  //  func onConnected(peripheral: CBPeripheral){
+  //    statusString = "Connected"
+  //  }
+  //
+  //  func onDisconnected(peripheral: CBPeripheral){
+  //    bleState = .disconnected;
+  //    statusString = "Disconnected"
+  //    connectionTimer.invalidate()
+  //    connectionLock = false
+  //  }
+  func onReady() {
 
     // Setup Notifications, to process writes from the FocusMotor peripheral
 

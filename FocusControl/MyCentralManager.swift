@@ -6,6 +6,9 @@
 //  Thin wrapper around Core Bluetooth Central Manager
 //  Use to create a Central application to talk to a remote BLE peripheral
 //
+// When using multiple MyPeripheral objects, there can only be one
+// MyCentralManager, and one MyCentralManagerDelegate.
+// Use one MyPeripheralDelegate for each Peripheral.
 
 import CoreBluetooth
 import UIKit
@@ -13,9 +16,11 @@ import UIKit
 protocol MyCentralManagerDelegate: AnyObject {
   func onCentralManagerStarted()
   func onCentralManagerNotAvailable()
-  func onFound(newPeripheral: CBPeripheral)
-  func onConnected(peripheral: CBPeripheral)
-  func onDisconnected(peripheral: CBPeripheral)
+  
+  // MyCentralManager forwards these to appropriate MyPeripheral
+  func onDidDiscover(newPeripheral: CBPeripheral)
+  func onDidConnect(peripheral: CBPeripheral)
+  func onDidDisconnect(peripheral: CBPeripheral)
 }
 
 class MyCentralManager: NSObject, CBCentralManagerDelegate {
@@ -23,39 +28,47 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
   weak var delegate: MyCentralManagerDelegate?
 
   // Core Bluetooth variables
-  private var cbCentralManager: CBCentralManager?
+  private static var cbCentralManager: CBCentralManager?
   private var service_uuid: CBUUID?
+  
+  // Singleton init
+//  override private init(){
+//
+//  }
   
   // Called by derived class to initialize BLE communication
   // ToDo: Manage by class level logical
   public func start() {
-    if cbCentralManager == nil {
-      cbCentralManager = CBCentralManager(delegate: self, queue: nil)
+    if MyCentralManager.cbCentralManager == nil {
+      MyCentralManager.cbCentralManager = CBCentralManager(delegate: self, queue: nil)
     }
   }
   
   public func findPeripheral(withService: CBUUID) {
     service_uuid = withService
-    cbCentralManager!.scanForPeripherals(withServices: [service_uuid!], options: nil)
+    MyCentralManager.cbCentralManager!.scanForPeripherals(withServices: [service_uuid!],
+                                                          options: nil)
   }
   
   public func disconnect(peripheral: CBPeripheral) {
-    cbCentralManager!.cancelPeripheralConnection(peripheral)
+    MyCentralManager.cbCentralManager!.cancelPeripheralConnection(peripheral)
   }
   
   //MARK: CBCentralManagerDelegate
 
-  // Step 1 - Start scanning for BLE DEVICE advertising required SERVICE
+  // Start scanning for BLE DEVICE advertising required SERVICE
   // Must issue scanForPeripherals(withServices: options:) to continue connection process
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
-    if (central.state == .poweredOn) {
-      delegate?.onCentralManagerStarted()
-    } else {
-      delegate?.onCentralManagerNotAvailable()
+    if let myCentralManagerDelegate = delegate{
+      if (central.state == .poweredOn) {
+        myCentralManagerDelegate.onCentralManagerStarted()
+      } else {
+        myCentralManagerDelegate.onCentralManagerNotAvailable()
+      }
     }
   }
 
-  // Step 2 - Once SERVICE found found, stop scanning and connect Peripheral
+  // Once SERVICE found found, stop scanning and connect Peripheral
   // Map Service UUID to newly report peripheral object
   // Must hold a reference to the discoveredPeripheral in onFound.
   func centralManager(_ central: CBCentralManager,
@@ -63,17 +76,24 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
                       advertisementData: [String : Any],
                       rssi RSSI: NSNumber)
   {
-    cbCentralManager!.stopScan()
-    delegate?.onFound(newPeripheral: discoveredPeripheral)
+    MyCentralManager.cbCentralManager!.stopScan()
+    
+    // TODO Need to figure out which peripheral to call here
+    if let myCentralManagerDelegate = delegate {
+      myCentralManagerDelegate.onDidDiscover(newPeripheral: discoveredPeripheral)
+    }
 
-    cbCentralManager!.connect(discoveredPeripheral, options: nil)
+    MyCentralManager.cbCentralManager!.connect(discoveredPeripheral, options: nil)
   }
   
-  // Step 3 - Once connected to peripheral, Find desired service
+  // Once connected to peripheral, Find desired service
   func centralManager(_ central: CBCentralManager,
                       didConnect connectedPeripheral: CBPeripheral)
   {
-    delegate?.onConnected(peripheral: connectedPeripheral)
+    // TODO Need to figure out which peripheral to call here
+    if let myCentralManagerDelegate = delegate {
+      myCentralManagerDelegate.onDidConnect(peripheral: connectedPeripheral)
+    }
 
     connectedPeripheral.discoverServices([service_uuid!]) // already know it has it!
   }
@@ -88,6 +108,9 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
       print(e.localizedDescription)
     }
     
-    delegate?.onDisconnected(peripheral: peripheral)
+    // TODO Need to figure out which peripheral to call here
+    if let myCentralManagerDelegate = delegate {
+      myCentralManagerDelegate.onDidDisconnect(peripheral: peripheral)
+    }
   }
 }
