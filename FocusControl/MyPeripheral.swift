@@ -21,53 +21,55 @@ protocol MyPeripheralDelegate: AnyObject {
 
 class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   
-  weak var delegate: MyPeripheralDelegate?
+  weak var mpDelegate: MyPeripheralDelegate?
   
-  private var centralManager: MyCentralManager?
+  private var centralManager = MyCentralManager.singleton
 
   private var cbPeripheral: CBPeripheral?
 
-  private var service_uuid: CBUUID     // UUID of desired service
-  private var ble_data_uuids: [CBUUID]  // UUID for each BLE data value
+  private var deviceName: String   // Peripheral device name
+  private var serviceUuid: CBUUID  // Desired service offered by peripheral
+  private var dataUuids: [CBUUID]  // UUID for each BLE data value
   
   // Dictionaries to look up characteristics and responders by UUID
   private var characteristicDictionary: [CBUUID: CBCharacteristic?] = [:]
   private var readResponder: [CBUUID: (Data)->Void] = [:]
   
-  init(serviceUUID: CBUUID, bleDataUUIDs: [CBUUID]) {
-
-    self.service_uuid = serviceUUID
-    self.ble_data_uuids = bleDataUUIDs
+  init(deviceName: String, serviceUUID: CBUUID, dataUUIDs: [CBUUID])
+  {
+    self.serviceUuid = serviceUUID
+    self.dataUuids = dataUUIDs
+    self.deviceName = deviceName
 
     super.init()  // NSObject
-
-    // TODO - deal with how second MyPeripheral calls findPeripheral
-    centralManager = MyCentralManager()
-    centralManager!.delegate = self
-    centralManager!.start() // will result in onCentralManagerStarted
   }
   
   func startBleConnection() {
-    centralManager!.findPeripheral(withService: service_uuid)
+    centralManager.findPeripheral(named: deviceName,
+                                  withService: serviceUuid,
+                                  mcmDelegate: self)
   }
   
   func endBleConnection() {
-    if let centralManager, let cbPeripheral {
+    if let cbPeripheral {
       centralManager.disconnect(peripheral: cbPeripheral)
     }
   }
   
   //MARK: MyCentralManagerDelegate
-  func onCentralManagerStarted() {
-    // Don't pass to MyPeripheralDelegate, because there could be multiple peripherals
-    // maybe this sould be class method, which calls start for any number of MyPeripherals
-    // in need of startBleConnection()
-    // TODO - deal with how second MyPeripheral calls findPeripheral
+  func onCentralManagerStarted()
+  {
+    print("MyPeripheral - onCentralManagerStarted()")
     startBleConnection()
+    if let myPeripheralDelegate = mpDelegate {
+      myPeripheralDelegate.onBleRunning()
+    }
   }
   
   func onCentralManagerNotAvailable() { // peripheral
-    // Don't pass to peripheral, because there could be multiple peripherals
+    // Don't pass to MyPeripheralDelegate, because there could be multiple peripherals
+    // It may make sense for this to be a class (static) method.
+    // OR have MyCentralManager call every MyPeripheral.
   }
   
   // WHEN USING MULTIPLE PERIPHERALS the onFound, onConnected, and
@@ -79,7 +81,7 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
     cbPeripheral = newPeripheral
     cbPeripheral!.delegate = self
 
-    if let myPeripheralDelegate = delegate {
+    if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onFound()
     }
   }
@@ -87,14 +89,14 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   // BLE Connected, but have not yet scanned for services and characeristics
   func onDidConnect(peripheral: CBPeripheral){
     // Pass to MyPeripheralDelegate
-    if let myPeripheralDelegate = delegate {
+    if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onConnected()
     }
   }
   
   func onDidDisconnect(peripheral: CBPeripheral){
     // Pass to MyPeripheralDelegate
-    if let myPeripheralDelegate = delegate {
+    if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onDisconnected()
     }
   }
@@ -112,7 +114,7 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
     }
     if let services = peripheral.services {
       for service in services {
-        peripheral.discoverCharacteristics(ble_data_uuids, for: service)
+        peripheral.discoverCharacteristics(dataUuids, for: service)
       }
     }
   }
@@ -134,7 +136,7 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
         characteristicDictionary[characteristic.uuid] = characteristic
       }
     }
-    if let myPeripheralDelegate = delegate {
+    if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onReady()
     }
   }

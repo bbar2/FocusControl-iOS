@@ -44,7 +44,7 @@ struct FocusView: View {
                 viewModel.connectionLock = false
                 viewModel.reportUiActive()
               } label: {
-                Image(systemName: "poweroff") // current state no timer
+                Image(systemName: "timer") // current state no timer
               }
             } else {
               Button(){
@@ -52,12 +52,12 @@ struct FocusView: View {
                 viewModel.connectionLock = true
                 viewModel.reportUiActive()
               } label: {
-                Image(systemName: "timer") // current state uses timer
+                Text(String(viewModel.timerValue))
               }
             }
           }
         } else {
-          Button("Reconnect"){
+          Button("Connect"){
             softBump()
             viewModel.connectBle()
             viewModel.reportUiActive()
@@ -71,9 +71,12 @@ struct FocusView: View {
       VStack {
         VStack{
           Text("XL Data").bold()
-          Text("X: \(viewModel.xlData.x)")
-          Text("Y: \(viewModel.xlData.y)")
-          Text("Z: \(viewModel.xlData.z)")
+          Text(String(format: "Pitch: %+7.2fº %+5.2f", viewModel.pitch, viewModel.xlData.y))
+          Text(String(format: "Roll: %+7.2fº %+5.2f", viewModel.roll, viewModel.xlData.x))
+          Text(String(format: "Yaw: %+7.2fº %+5.2f", viewModel.yaw, viewModel.xlData.z))
+//          Text(String(format: "Ay: %+5.2f", viewModel.xlData.y))
+//          Text(String(format: "Ax: %+5.2f", viewModel.xlData.x))
+//          Text(String(format: "Az: %+5.2f", viewModel.xlData.z))
           HStack{
             Button("Update"){
               softBump()
@@ -149,7 +152,7 @@ struct FocusView: View {
     .font(.title)
     
     .onAppear{
-      viewModel.focusMotorInit()
+      viewModel.viewModelInit()
       
       //Change picker font size
       UISegmentedControl.appearance().setTitleTextAttributes(
