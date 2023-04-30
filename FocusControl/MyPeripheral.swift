@@ -60,7 +60,7 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   func onCentralManagerStarted()
   {
     print("MyPeripheral - onCentralManagerStarted()")
-    startBleConnection()
+//    startBleConnection()
     if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onBleRunning()
     }

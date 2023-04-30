@@ -271,7 +271,7 @@ class FocusViewModel : MyPeripheralDelegate,
     print("onBleRunning")
     bleState = .disconnected
     statusString = "Ready ..."
-    connectBle(); // First connection, upon BLE initization
+    connectBle()  // First connection, upon BLE initization
   }
   
   func onBleNotAvailable() { // peripheral
