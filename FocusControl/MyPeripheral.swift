@@ -11,8 +11,6 @@
 import CoreBluetooth
 
 protocol MyPeripheralDelegate: AnyObject {
-  func onBleRunning()
-  func onBleNotAvailable()
   func onFound()
   func onConnected()
   func onDisconnected()
@@ -25,7 +23,9 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   
   private var centralManager = MyCentralManager.singleton
 
-  private var cbPeripheral: CBPeripheral?
+  private var cbPeripheral: CBPeripheral? = nil
+  
+  private var id: UUID?   // used for subsequent connections
 
   private var deviceName: String   // Peripheral device name
   private var serviceUuid: CBUUID  // Desired service offered by peripheral
@@ -37,6 +37,7 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   
   init(deviceName: String, serviceUUID: CBUUID, dataUUIDs: [CBUUID])
   {
+    print("MyPeripheral \(deviceName) init")
     self.serviceUuid = serviceUUID
     self.dataUuids = dataUUIDs
     self.deviceName = deviceName
@@ -45,9 +46,14 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   }
   
   func startBleConnection() {
-    centralManager.findPeripheral(named: deviceName,
-                                  withService: serviceUuid,
-                                  mcmDelegate: self)
+    // reConnect if this peripheral has already been found
+    if let alreadyFoundPeripheral = cbPeripheral {
+      centralManager.reConnect(alreadyFoundPeripheral)
+    } else {
+      centralManager.findPeripheral(named: deviceName,
+                                    withService: serviceUuid,
+                                    mcmDelegate: self)
+    }
   }
   
   func endBleConnection() {
@@ -57,20 +63,6 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   }
   
   //MARK: MyCentralManagerDelegate
-  func onCentralManagerStarted()
-  {
-    print("MyPeripheral - onCentralManagerStarted()")
-//    startBleConnection()
-    if let myPeripheralDelegate = mpDelegate {
-      myPeripheralDelegate.onBleRunning()
-    }
-  }
-  
-  func onCentralManagerNotAvailable() { // peripheral
-    // Don't pass to MyPeripheralDelegate, because there could be multiple peripherals
-    // It may make sense for this to be a class (static) method.
-    // OR have MyCentralManager call every MyPeripheral.
-  }
   
   // WHEN USING MULTIPLE PERIPHERALS the onFound, onConnected, and
   // onDisconnected MyCentralManagerDelegate methods must check peripheral
@@ -92,6 +84,9 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
     if let myPeripheralDelegate = mpDelegate {
       myPeripheralDelegate.onConnected()
     }
+    
+    // Save identifier for future connections
+    id = peripheral.identifier
   }
   
   func onDidDisconnect(peripheral: CBPeripheral){
@@ -230,3 +225,4 @@ class MyPeripheral :NSObject, CBPeripheralDelegate, MyCentralManagerDelegate {
   }
   
 }
+

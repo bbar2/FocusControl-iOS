@@ -155,6 +155,7 @@ class FocusViewModel : MyPeripheralDelegate,
                               dataUUIDs: [FOCUS_MSG_UUID, ACCEL_XYZ_UUID])
     uponBleReadyAction = nil
     focusMotor.mpDelegate = self
+    connectBle()
   }
   
   // Called once by ViewController
@@ -267,16 +268,6 @@ class FocusViewModel : MyPeripheralDelegate,
   }
   
   //MARK: MyPeripheralDelegate
-  func onBleRunning() {
-    print("onBleRunning")
-    bleState = .disconnected
-    statusString = "Ready ..."
-    connectBle()  // First connection, upon BLE initization
-  }
-  
-  func onBleNotAvailable() { // peripheral
-    bleState = .disconnected
-  }
   
   func onFound(){
     statusString = "Focus Motor Found"

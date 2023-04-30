@@ -138,7 +138,7 @@ struct FocusView: View {
     } // top level VStack
     .onChange(of: scenePhase) { newPhase in
       if newPhase == .active {
-        viewModel.connectBle() // TODO this accidentally issues 1st connect before started
+        viewModel.connectBle()
       } else if newPhase == .inactive {
         viewModel.disconnectBle()
       } else if newPhase == .background {

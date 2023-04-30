@@ -13,11 +13,8 @@
 import CoreBluetooth
 import UIKit
 
+// MyCentralManager forwards these to appropriate MyPeripheral
 protocol MyCentralManagerDelegate: AnyObject {
-  func onCentralManagerStarted()
-  func onCentralManagerNotAvailable()
-  
-  // MyCentralManager forwards these to appropriate MyPeripheral
   func onDidDiscover(newPeripheral: CBPeripheral)
   func onDidConnect(peripheral: CBPeripheral)
   func onDidDisconnect(peripheral: CBPeripheral)
@@ -33,11 +30,35 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
   private var cbCentralManager: CBCentralManager?
   private var nameToService: [String: CBUUID] = [:]
   private var nameToMcmDelegate: [String: MyCentralManagerDelegate] = [:]
+  private var nameToBeenFound: [String: Bool] = [:]
  
   // Singleton init
   private override init() {
     super.init()
     cbCentralManager = CBCentralManager(delegate: self, queue: nil)
+  }
+  
+  private func servicesNotFound() -> [CBUUID] {
+    var serviceList: [CBUUID] = []
+    for (peripheralName, isFound) in nameToBeenFound {
+      if !isFound {
+        if let service = nameToService[peripheralName] {
+          serviceList.append(service)
+        }
+      }
+    }
+    return serviceList
+  }
+  
+  private func scanForServicesNotYetFound() {
+    if cbCentralManager!.isScanning {
+      cbCentralManager!.stopScan()
+    }
+    // Scan for all services that have not been found
+    let serviceList = servicesNotFound()
+    if !serviceList.isEmpty {
+      cbCentralManager!.scanForPeripherals(withServices: serviceList)
+    }
   }
     
   // The peripheral withService must also have the named name
@@ -45,12 +66,27 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
                              withService peripheralService: CBUUID,
                              mcmDelegate: MyCentralManagerDelegate)
   {
+    print("MyCentralManager findPeripheral named \(peripheralName)")
+    
     // Update Dictionaries used by CBCentralManagerDelegate to map to MyPeripheral(s)
     nameToMcmDelegate[peripheralName] = mcmDelegate
     nameToService[peripheralName] = peripheralService
+    nameToBeenFound[peripheralName] = false
     
     // Start Core BlueTooth connection process
-    cbCentralManager!.scanForPeripherals(withServices: [peripheralService])
+    if let cbCM = cbCentralManager {
+      if (cbCM.state != .poweredOn) {
+        print("  -- cbCentralManager is not powered on")
+      } else {
+        scanForServicesNotYetFound()
+      }
+    } else {
+      print("cbCentralManager does not exist")
+    }
+  }
+  
+  public func reConnect(_ peripheral: CBPeripheral) {
+    cbCentralManager!.connect(peripheral, options: nil)
   }
   
   public func disconnect(peripheral: CBPeripheral) {
@@ -61,17 +97,19 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
   // Inform all MyPeripheral devices that Central has Started or is NotAvailable
   func centralManagerDidUpdateState(_ central: CBCentralManager)
   {
+    print("MyCentralManager - centralManagerDidUpdateState")
     // There is a good chance that this will still be empty
     // TODO - this is almost certainly not populated yet.
     // TODO - only  way to proceed, is for model to issue a findPeripheral with
     // some other mechanism.  Yet, findPeripheral really can't go until this has.
     // This has potential race problems.
-    for (_, myPeripheral) in nameToMcmDelegate {
-      if (central.state == .poweredOn) {
-        myPeripheral.onCentralManagerStarted()
-      } else {
-        myPeripheral.onCentralManagerNotAvailable()
-      }
+    print("  - number of nameToMcmDelegate items = \(nameToMcmDelegate.count)")
+    
+    // If these dictionaries are populated, must issue scanForPeripherals
+    // now because it could not have been issued in findPeripheral above
+    // since .state was not yet == .poweredOn
+    if (central.state == .poweredOn) {
+      scanForServicesNotYetFound()
     }
   }
 
@@ -83,20 +121,26 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
                       advertisementData: [String : Any],
                       rssi RSSI: NSNumber)
   {
-    cbCentralManager!.stopScan() // TODO - deal with scanning for more than once device
-
     // Select the associated MyCentralManagerDelegate (MyPeripheral Object)
     if let discoveredName = discoveredPeripheral.name {
+
+      // Stop scanning for this guy, and resume scanning for anyone else
+      nameToBeenFound[discoveredName] = true
+      scanForServicesNotYetFound()
+      
+      // let peripheral act on discovery
       if let myPeripheral = nameToMcmDelegate[discoveredName] {
         myPeripheral.onDidDiscover(newPeripheral: discoveredPeripheral)
       } else {
         print("Unexpected name in didDiscover: \(discoveredName)")
       }
+      
+      cbCentralManager!.connect(discoveredPeripheral, options: nil)
+
     } else {
-      print("discoveredPeripheral has no name")
+      print("WHY AM I HERE - discoveredPeripheral has no name")
     }
     
-    cbCentralManager!.connect(discoveredPeripheral, options: nil)
   }
   
   // Once connected to peripheral, Find desired service
@@ -130,7 +174,6 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
       print(e.localizedDescription)
     }
     
-    print("centralManager.didDisconnectPeripheral")
 
     // Select the associated MyCentralManagerDelegate (MyPeripheral Object)
     if let disconnectedName = disconnectedPeripheral.name {
@@ -144,3 +187,4 @@ class MyCentralManager: NSObject, CBCentralManagerDelegate {
     }
   }
 }
+
