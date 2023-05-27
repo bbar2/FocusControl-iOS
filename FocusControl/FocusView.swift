@@ -18,6 +18,9 @@
 import SwiftUI
 
 struct FocusView: View {
+//  @ObservedObject var guideModel: GuideModel
+  @ObservedObject var armModel: ArmAccelModel
+  
   @StateObject var viewModel = FocusViewModel()
   @Environment(\.scenePhase) var scenePhase
   
@@ -71,9 +74,15 @@ struct FocusView: View {
       VStack {
         VStack{
           Text("XL Data").bold()
-          Text(String(format: "Pitch: %+7.2fº %+5.2f", viewModel.pitch, viewModel.xlData.y))
-          Text(String(format: "Roll: %+7.2fº %+5.2f", viewModel.roll, viewModel.xlData.x))
-          Text(String(format: "Yaw: %+7.2fº %+5.2f", viewModel.yaw, viewModel.xlData.z))
+          Text(String(format: "Pitch: %+7.2fº %+5.2f",
+                      viewModel.pitch,
+                      viewModel.rhsXlData.x))
+          Text(String(format: "Roll: %+7.2fº %+5.2f",
+                      viewModel.roll,
+                      viewModel.rhsXlData.y))
+          Text(String(format: "Yaw: %+7.2fº %+5.2f",
+                      viewModel.yaw,
+                      viewModel.rhsXlData.z))
 //          Text(String(format: "Ay: %+5.2f", viewModel.xlData.y))
 //          Text(String(format: "Ax: %+5.2f", viewModel.xlData.x))
 //          Text(String(format: "Az: %+5.2f", viewModel.xlData.z))
@@ -152,7 +161,8 @@ struct FocusView: View {
     .font(.title)
     
     .onAppear{
-      viewModel.viewModelInit()
+      // pass in a reference to the ArmAccel
+      viewModel.viewModelInit(linkToArmAccelModel: armModel)
       
       //Change picker font size
       UISegmentedControl.appearance().setTitleTextAttributes(
@@ -177,8 +187,9 @@ struct FocusView: View {
 }
 
 struct MainView_Previews: PreviewProvider {
+  static let previewArmModel = ArmAccelModel()
   static var previews: some View {
-    FocusView()
+    FocusView(armModel: previewArmModel)
       .previewDevice(PreviewDevice(rawValue: "iPhone Xs"))
   }
 }
